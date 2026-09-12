@@ -1,0 +1,15 @@
+# Runtime and test data
+backend/*.db
+backend/tests/*.db
+__pycache__/
+**/__pycache__/
+
+# Frontend build output
+frontend/dist/
+
+# Docker
+.docker/
+.dockerignore
+**/*.pid
+
+.kilo

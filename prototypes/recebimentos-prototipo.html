@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cypher · Recebimentos</title>
+    <style>
+      :root {
+        --paper: #f5f3ed;
+        --paper-deep: #e9e8df;
+        --ink: #1d2924;
+        --muted: #67716a;
+        --line: #d6d8cf;
+        --green: #1d5c43;
+        --green-soft: #d9eadb;
+        --green-light: #eff7f0;
+        --coral: #b5503c;
+        --white: #fffefa;
+        --radius: 13px;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--paper); color: var(--ink); font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      button, input, select { font: inherit; }
+      button { cursor: pointer; }
+      .shell { max-width: 1440px; min-height: 100vh; margin: 0 auto; padding: 26px 42px 52px; }
+      .topbar { display: flex; justify-content: space-between; align-items: center; padding-bottom: 25px; border-bottom: 1px solid var(--line); }
+      .brand { display: flex; align-items: center; gap: 10px; color: var(--green); font-size: 20px; font-weight: 750; letter-spacing: -0.06em; }
+      .brand-mark { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; color: var(--white); background: var(--green); font-size: 17px; }
+      .nav { display: flex; gap: 25px; }
+      .nav a { color: var(--muted); font-size: 14px; text-decoration: none; }
+      .nav a.active { color: var(--ink); font-weight: 700; }
+      .identity { color: var(--muted); font-size: 13px; }
+      .title-row { display: flex; justify-content: space-between; align-items: end; margin: 48px 0 30px; }
+      h1 { max-width: 620px; margin: 0; font-size: clamp(2.35rem, 5vw, 4.65rem); font-weight: 700; letter-spacing: -0.075em; line-height: 0.96; }
+      .title-row p { max-width: 330px; margin: 0 0 4px; color: var(--muted); font-size: 15px; line-height: 1.55; }
+      .workspace { display: grid; grid-template-columns: minmax(360px, 0.88fr) minmax(500px, 1.55fr); gap: 24px; align-items: start; }
+      .project-sheet { min-height: 545px; padding: 29px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--white); }
+      .sheet-head { display: flex; justify-content: space-between; gap: 15px; align-items: start; }
+      .kind { display: inline-block; padding: 5px 9px; border-radius: 99px; color: var(--green); background: var(--green-soft); font-size: 12px; font-weight: 700; }
+      h2 { margin: 12px 0 4px; font-size: 25px; letter-spacing: -0.045em; }
+      .client { margin: 0; color: var(--muted); font-size: 14px; }
+      .status { padding-top: 4px; color: var(--coral); font-size: 13px; font-weight: 700; white-space: nowrap; }
+      .money-block { margin: 50px 0 32px; }
+      .money-block span, .balance span { color: var(--muted); font-size: 13px; }
+      .money-block strong { display: block; margin-top: 7px; font-size: 42px; letter-spacing: -0.07em; }
+      .progress { height: 10px; margin: 13px 0 9px; overflow: hidden; border-radius: 99px; background: var(--paper-deep); }
+      .progress i { display: block; width: 66.67%; height: 100%; border-radius: inherit; background: var(--green); }
+      .received { color: var(--muted); font-size: 13px; }
+      .received b { color: var(--green); }
+      .balance { display: grid; grid-template-columns: 1fr auto; align-items: center; padding: 18px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+      .balance strong { font-size: 20px; letter-spacing: -0.04em; }
+      .sheet-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 27px; }
+      .text-button { border: 0; padding: 8px 0; color: var(--muted); background: transparent; font-size: 13px; }
+      .text-button:hover { color: var(--green); text-decoration: underline; text-underline-offset: 4px; }
+      .button { border: 1px solid var(--green); border-radius: 7px; padding: 11px 15px; color: var(--white); background: var(--green); font-size: 14px; font-weight: 700; }
+      .button:hover { background: #164734; }
+      .ledger { overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius); background: var(--white); }
+      .ledger-header { display: flex; justify-content: space-between; align-items: center; padding: 23px 27px; border-bottom: 1px solid var(--line); }
+      .ledger-header h2 { margin: 0; font-size: 18px; }
+      .ledger-header span { color: var(--muted); font-size: 13px; }
+      .payment { display: grid; grid-template-columns: 100px minmax(170px, 1fr) 155px 110px; gap: 18px; align-items: center; min-height: 89px; padding: 16px 27px; border-bottom: 1px solid var(--line); }
+      .payment:last-of-type { border-bottom: 0; }
+      .date { color: var(--muted); font-size: 13px; }
+      .payment-title { font-size: 14px; font-weight: 700; }
+      .payment-title small { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; font-weight: 400; }
+      .method { color: var(--muted); font-size: 13px; }
+      .amount { color: var(--green); font-size: 16px; font-weight: 750; letter-spacing: -0.04em; text-align: right; }
+      .new-payment { margin-top: 22px; padding: 24px 27px 27px; background: var(--green-light); border-top: 1px solid #cce0ce; }
+      .new-payment h3 { margin: 0 0 18px; color: var(--green); font-size: 16px; letter-spacing: -0.03em; }
+      .fields { display: grid; grid-template-columns: 1fr 1fr 1.4fr auto; gap: 10px; align-items: end; }
+      label { display: grid; gap: 6px; color: var(--muted); font-size: 12px; }
+      input, select { width: 100%; min-height: 41px; border: 1px solid #c8cec5; border-radius: 6px; padding: 9px 10px; color: var(--ink); background: var(--white); }
+      input:focus, select:focus { outline: 2px solid #8dbfa0; outline-offset: 1px; border-color: var(--green); }
+      .totals { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin-top: 24px; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius); background: var(--line); }
+      .total { padding: 19px 22px; background: var(--white); }
+      .total span { display: block; color: var(--muted); font-size: 12px; }
+      .total strong { display: block; margin-top: 7px; font-size: 20px; letter-spacing: -0.05em; }
+      .total:nth-child(2) strong { color: var(--green); }
+      .total:nth-child(3) strong { color: var(--coral); }
+      @media (max-width: 920px) { .shell { padding: 22px; } .nav { display: none; } .title-row { align-items: start; flex-direction: column; gap: 18px; margin-top: 35px; } .workspace { grid-template-columns: 1fr; } .project-sheet { min-height: auto; } .payment { grid-template-columns: 80px 1fr auto; } .method { display: none; } .fields { grid-template-columns: 1fr 1fr; } }
+      @media (max-width: 540px) { .identity { display: none; } h1 { font-size: 2.6rem; } .payment { grid-template-columns: 1fr auto; gap: 6px; } .payment .date { grid-row: 1; } .payment-title { grid-column: 1; } .amount { grid-column: 2; grid-row: 1 / span 2; } .totals { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div class="brand"><span class="brand-mark">C</span>cypher</div>
+        <nav class="nav" aria-label="Navegação"><a href="#">Visão geral</a><a href="#">Transações</a><a href="#">Orçamentos</a><a href="#" class="active">Recebimentos</a></nav>
+        <span class="identity">Dados locais</span>
+      </header>
+
+      <section class="title-row">
+        <h1>Dinheiro que ainda vai entrar.</h1>
+        <p>Registre o valor combinado de cada serviço e acompanhe os pagamentos conforme acontecem.</p>
+      </section>
+
+      <section class="workspace" aria-label="Detalhe de recebimento">
+        <article class="project-sheet">
+          <div class="sheet-head">
+            <div><span class="kind">E-commerce</span><h2>Loja da Casa Nativa</h2><p class="client">Cliente: Casa Nativa</p></div>
+            <span class="status">Em aberto</span>
+          </div>
+          <div class="money-block"><span>Valor combinado</span><strong>R$ 750,00</strong><div class="progress"><i></i></div><p class="received"><b>R$ 500,00 recebidos</b> de R$ 750,00</p></div>
+          <div class="balance"><span>Falta receber</span><strong>R$ 250,00</strong></div>
+          <div class="sheet-actions"><button class="text-button">Editar projeto</button><button class="button">Registrar pagamento</button></div>
+        </article>
+
+        <section class="ledger">
+          <header class="ledger-header"><h2>Pagamentos recebidos</h2><span>2 lançamentos</span></header>
+          <div class="payment"><span class="date">12 set. 2026</span><span class="payment-title">Entrada<small>Primeira parcela</small></span><span class="method">Pix</span><strong class="amount">+ R$ 100,00</strong></div>
+          <div class="payment"><span class="date">18 set. 2026</span><span class="payment-title">Segunda parcela<small>Pagamento confirmado</small></span><span class="method">Transferência</span><strong class="amount">+ R$ 400,00</strong></div>
+          <form class="new-payment">
+            <h3>Novo pagamento</h3>
+            <div class="fields">
+              <label>Valor recebido<input type="text" value="R$ 250,00" /></label>
+              <label>Data<input type="text" value="25/09/2026" /></label>
+              <label>Observação<input type="text" placeholder="Ex.: parcela final" /></label>
+              <button class="button" type="button">Registrar</button>
+            </div>
+          </form>
+        </section>
+      </section>
+
+      <section class="totals" aria-label="Resumo de recebimentos">
+        <div class="total"><span>Projetos em andamento</span><strong>04</strong></div>
+        <div class="total"><span>Recebido neste mês</span><strong>R$ 3.240,00</strong></div>
+        <div class="total"><span>A receber</span><strong>R$ 1.890,00</strong></div>
+      </section>
+    </main>
+  </body>
+</html>

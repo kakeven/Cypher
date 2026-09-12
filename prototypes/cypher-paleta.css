@@ -1,0 +1,71 @@
+:root {
+  color-scheme: dark;
+  --background: #0F1115;
+  --surface: #181B21;
+  --secondary: #20242C;
+  --primary: #3B82F6;
+  --primary-hover: #60A5FA;
+  --highlight: #34D399;
+  --foreground: #F4F4F5;
+  --secondary-text: #A1A1AA;
+  --border: #2D323C;
+  --success: #34D399;
+  --warning: #F59E0B;
+  --error: #F87171;
+  --shell: var(--background);
+  --panel: var(--surface);
+  --panel-2: var(--secondary);
+  --line: var(--border);
+  --line-hot: var(--primary);
+  --text: var(--foreground);
+  --soft: var(--secondary-text);
+  --muted: var(--secondary-text);
+  --matrix: var(--primary);
+  --matrix-bg: color-mix(in srgb, var(--primary) 9%, transparent);
+  --red: var(--error);
+  --amber: var(--warning);
+}
+
+body, .app { background: var(--background); color: var(--foreground); }
+.side { background: var(--secondary); border-color: var(--border); }
+.logo { color: var(--foreground); }
+.logo span { color: var(--primary); background: var(--surface); border-color: var(--border); }
+.side nav a, .side small, .side small b { color: var(--secondary-text); }
+.side small { border-color: var(--border); }
+.side nav a:hover { background: var(--surface); color: var(--foreground); }
+.side nav a[aria-current="page"] { color: var(--primary); background: var(--matrix-bg); box-shadow: inset 3px 0 var(--primary); }
+.side nav a[aria-current="page"] i { background: var(--primary); border-color: var(--primary); }
+.topbar { border-color: var(--border); }
+.search { background: var(--secondary); color: var(--foreground); }
+.avatar { background: var(--matrix-bg); color: var(--primary); }
+.holding { background: var(--surface); border-color: var(--border); box-shadow: inset 0 2px var(--primary); }
+.mini { background: var(--secondary); border-color: var(--border); }
+.mini:nth-child(1) { border-top-color: var(--success); }
+.mini:nth-child(2) { border-top-color: var(--error); }
+.mini:nth-child(3) { border-top-color: var(--primary); }
+.mini:nth-child(4) { border-top-color: var(--highlight); }
+.up, .holding small.up, .mini small.up, .payments b { color: var(--success); }
+.down, .mini small.down { color: var(--error); }
+.graph { background: repeating-linear-gradient(to bottom, transparent 0, transparent 36px, var(--border) 37px); }
+.graph path:first-child { stroke: var(--primary); }
+.graph path:last-child { fill: color-mix(in srgb, var(--primary) 8%, transparent); }
+.range button.active, .button { background: var(--primary); border-color: var(--primary); color: #FFF; }
+.button:hover, .range button.active:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
+.button.alt { color: var(--primary); background: var(--surface); border-color: var(--border); }
+.button.alt:hover { background: var(--matrix-bg); border-color: var(--primary); }
+.text { color: var(--primary); }
+.text:hover { color: var(--primary-hover); }
+.ghost:hover { background: var(--secondary); color: var(--foreground); }
+.fields input, .fields select, .payment-form input, .filters select, .period { background: var(--surface); color: var(--foreground); border-color: var(--border); }
+input::placeholder { color: var(--secondary-text); opacity: 1; }
+.payment-form { background: var(--secondary); }
+.tag.green { color: var(--success); background: color-mix(in srgb, var(--success) 9%, transparent); }
+.tag.red { color: var(--error); background: color-mix(in srgb, var(--error) 8%, transparent); }
+.budget.warning .tag { color: var(--warning) !important; background: color-mix(in srgb, var(--warning) 10%, transparent) !important; }
+.kind { color: var(--primary); background: var(--matrix-bg); }
+.bar { background: var(--secondary); }
+.bar i { background: var(--primary); }
+.budget.warning .bar i { background: var(--warning); }
+.budget.danger .bar i { background: var(--error); }
+.goal:nth-child(2) .bar i { background: var(--highlight); }
+.goal:nth-child(3) .bar i { background: var(--success); }

@@ -1,0 +1,1 @@
+"""Consultas consolidadas do painel."""
