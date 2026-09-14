@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 
 from ..core.database import get_db
@@ -22,6 +22,14 @@ def create_receivable(body: ReceivableIn, db: Session = Depends(get_db)): return
 
 @router.get("/{receivable_id}")
 def get_receivable(receivable_id: int, db: Session = Depends(get_db)): return call(lambda: ReceivableService(db).get(receivable_id))
+
+@router.put("/{receivable_id}")
+def update_receivable(receivable_id: int, body: ReceivableIn, db: Session = Depends(get_db)): return call(lambda: ReceivableService(db).update(receivable_id, body))
+
+@router.delete("/{receivable_id}", status_code=204)
+def delete_receivable(receivable_id: int, db: Session = Depends(get_db)):
+    call(lambda: ReceivableService(db).delete(receivable_id))
+    return Response(status_code=204)
 
 @router.post("/{receivable_id}/payments", status_code=201)
 def create_receivable_payment(receivable_id: int, body: ReceivablePaymentIn, db: Session = Depends(get_db)): return call(lambda: ReceivableService(db).add_payment(receivable_id, body))

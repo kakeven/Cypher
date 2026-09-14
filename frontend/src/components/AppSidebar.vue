@@ -5,6 +5,7 @@ const links = [
   { to: '/orcamentos', label: 'Orçamentos' },
   { to: '/metas', label: 'Metas' },
   { to: '/recebimentos', label: 'Recebimentos' },
+  { to: '/recorrencias', label: 'Agenda' },
 ]
 </script>
 

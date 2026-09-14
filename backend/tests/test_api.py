@@ -145,6 +145,18 @@ def test_budget_and_goal_completion():
     assert loaded["is_completed"] is True
 
 
+def test_goal_deposit_reduces_available_balance():
+    category = category_id()
+    client.post("/api/transactions", json={"date": date.today().isoformat(), "type": "income", "amount": 500, "category_id": category})
+    balance_before_deposit = client.get("/api/dashboard").json()["balance"]
+    goal = client.post("/api/goals", json={"name": "Reserva", "target_amount": 1000}).json()
+
+    response = client.post(f"/api/goals/{goal['id']}/deposits", json={"amount": 125, "reference_month": date.today().strftime("%Y-%m")})
+
+    assert response.status_code == 201
+    assert client.get("/api/dashboard").json()["balance"] == balance_before_deposit - 125
+
+
 def test_receivable_records_partial_payments_as_income():
     created = client.post("/api/receivables", json={"name": "Projeto ACME", "client": "ACME", "total_amount": 750, "service_type": "Site institucional"})
     assert created.status_code == 201
@@ -167,6 +179,49 @@ def test_receivable_records_partial_payments_as_income():
     assert any(item["id"] == first.json()["transaction_id"] and item["amount"] == 100.0 for item in transactions)
 
 
+def test_receivable_can_be_updated_and_deleted_with_its_payments():
+    created = client.post("/api/receivables", json={"name": "Projeto", "client": "Cliente", "total_amount": 300, "service_type": "Sistema"}).json()
+    payment = client.post(f"/api/receivables/{created['id']}/payments", json={"amount": 100, "received_on": date.today().isoformat()}).json()
+
+    updated = client.put(f"/api/receivables/{created['id']}", json={"name": "Projeto revisado", "client": None, "total_amount": 400, "service_type": "E-commerce"})
+    assert updated.status_code == 200
+    assert updated.json()["name"] == "Projeto revisado"
+    assert client.put(f"/api/receivables/{created['id']}", json={"name": "Projeto", "total_amount": 99, "service_type": "Sistema"}).status_code == 422
+
+    assert client.delete(f"/api/receivables/{created['id']}").status_code == 204
+    assert client.get(f"/api/receivables/{created['id']}").status_code == 404
+    assert all(item["id"] != payment["transaction_id"] for item in client.get("/api/transactions").json())
+
+
 def test_receivable_accepts_only_service_types():
     response = client.post("/api/receivables", json={"name": "Projeto", "total_amount": 100, "service_type": "Aplicativo"})
     assert response.status_code == 422
+
+
+def test_recurring_generates_occurrences_and_confirmation_creates_transaction():
+    category = category_id()
+    recurring = client.post("/api/recurring-transactions", json={
+        "name": "Assinatura", "type": "expense", "amount": 39.9, "category_id": category,
+        "frequency": "monthly", "interval": 1, "day_of_month": date.today().day, "start_date": date.today().isoformat(),
+    })
+    assert recurring.status_code == 201
+    generated = client.post(f"/api/recurring-transactions/{recurring.json()['id']}/generate-occurrences").json()
+    assert generated
+    occurrence = next(value for value in generated if value["due_date"] == date.today().isoformat())
+    assert client.get("/api/occurrences", params={"period": date.today().strftime("%Y-%m")}).status_code == 200
+    confirmed = client.post(f"/api/occurrences/{occurrence['id']}/confirm")
+    assert confirmed.status_code == 200
+    assert confirmed.json()["status"] == "paid"
+    assert any(row["id"] == confirmed.json()["transaction_id"] for row in client.get("/api/transactions").json())
+
+
+def test_recurring_pause_prevents_generation():
+    category = category_id()
+    recurring = client.post("/api/recurring-transactions", json={
+        "name": "Salário", "type": "income", "amount": 1000, "category_id": category,
+        "frequency": "weekly", "interval": 1, "day_of_week": date.today().weekday(), "start_date": date.today().isoformat(),
+    }).json()
+    client.post(f"/api/recurring-transactions/{recurring['id']}/generate-occurrences")
+    assert client.post(f"/api/recurring-transactions/{recurring['id']}/pause").json()["is_active"] is False
+    assert client.post(f"/api/recurring-transactions/{recurring['id']}/generate-occurrences").status_code == 422
+    assert client.post(f"/api/recurring-transactions/{recurring['id']}/resume").json()["is_active"] is True

@@ -12,6 +12,8 @@ from .goals.model import Goal, GoalDeposit
 from .goals.router import router as goals_router
 from .receivables.model import Receivable, ReceivablePayment
 from .receivables.router import router as receivables_router
+from .recurring.model import RecurringOccurrence, RecurringTransaction
+from .recurring.router import router as recurring_router
 from .transactions.model import Transaction
 from .transactions.router import router as transactions_router
 
@@ -40,5 +42,6 @@ def create_app() -> FastAPI:
     app.include_router(dashboard_router, prefix="/api")
     app.include_router(goals_router, prefix="/api")
     app.include_router(receivables_router, prefix="/api")
+    app.include_router(recurring_router, prefix="/api")
     app.on_event("startup")(startup)
     return app

@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { api, brl } from '@/services/api'
 import { useToast } from '@/composables/useToast'
 import { currentMonth } from '@/utils/format'
@@ -12,6 +12,7 @@ const error = ref('')
 const loading = ref(false)
 const values = reactive({})
 const newCategory = reactive({ name: '', color: '#6D8BFF' })
+const contextMenu = ref(null)
 
 async function load() {
   loading.value = true
@@ -50,6 +51,42 @@ async function createCategory() {
   }
 }
 
+function openContextMenu(event, item) {
+  contextMenu.value = {
+    item,
+    x: Math.min(event.clientX, window.innerWidth - 168),
+    y: Math.min(event.clientY, window.innerHeight - 100),
+  }
+}
+
+function closeContextMenu() {
+  contextMenu.value = null
+}
+
+function editBudget() {
+  const item = contextMenu.value?.item
+  if (!item) return
+  closeContextMenu()
+  requestAnimationFrame(() => {
+    const input = document.getElementById(`limit-${item.id}`)
+    input?.focus()
+    input?.select()
+  })
+}
+
+async function deleteBudget() {
+  const item = contextMenu.value?.item
+  if (!item || !window.confirm(`Remover o limite de orçamento para “${item.name}”?`)) return
+  closeContextMenu()
+  try {
+    await api.setBudget(item.id, null)
+    toast.success(`Limite de ${item.name} removido.`)
+    await load()
+  } catch (e) {
+    error.value = e.message
+  }
+}
+
 function state(item) {
   if (!item.percent) return 'normal'
   if (item.percent >= 100) return 'danger'
@@ -57,7 +94,16 @@ function state(item) {
   return 'normal'
 }
 
-onMounted(load)
+onMounted(() => {
+  load()
+  window.addEventListener('click', closeContextMenu)
+  window.addEventListener('scroll', closeContextMenu, true)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('click', closeContextMenu)
+  window.removeEventListener('scroll', closeContextMenu, true)
+})
 </script>
 
 <template>
@@ -87,7 +133,7 @@ onMounted(load)
     <div v-if="loading" class="empty" role="status" aria-live="polite">Carregando orçamentos…</div>
 
     <section v-else class="budget-grid">
-      <article v-for="item in items" :key="item.id" class="card">
+      <article v-for="item in items" :key="item.id" class="card" @contextmenu.prevent="openContextMenu($event, item)">
         <div class="title">
           <span :style="{ background: item.color }" class="dot" aria-hidden="true" />
           <h2>{{ item.name }}</h2>
@@ -109,6 +155,11 @@ onMounted(load)
         </form>
       </article>
     </section>
+
+    <div v-if="contextMenu" class="context-menu" :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }" role="menu" @click.stop>
+      <button type="button" role="menuitem" @click="editBudget">Editar</button>
+      <button type="button" class="danger" role="menuitem" @click="deleteBudget">Excluir</button>
+    </div>
   </div>
 </template>
 
@@ -135,4 +186,8 @@ onMounted(load)
 .budget-form { display: flex; gap: 8px; }
 .budget-form input { min-width: 0; flex: 1; }
 .budget-form .button { padding: 8px 10px; }
+.context-menu { position: fixed; z-index: 10; display: grid; width: 160px; padding: 4px; border: 1px solid var(--color-border-strong); border-radius: 7px; background: var(--color-surface-raised); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28); }
+.context-menu button { border: 0; border-radius: 4px; padding: 8px 10px; color: var(--color-text-primary); text-align: left; background: transparent; cursor: pointer; font-size: 13px; }
+.context-menu button:hover { background: var(--color-surface); }
+.context-menu .danger { color: var(--color-danger); }
 </style>

@@ -11,3 +11,4 @@ class ReceivableRepository:
     def payments(self, receivable_id: int): return list(self.db.scalars(select(ReceivablePayment).where(ReceivablePayment.receivable_id == receivable_id).order_by(ReceivablePayment.received_on.desc(), ReceivablePayment.id.desc())))
     def received_amount(self, receivable_id: int): return self.db.scalar(select(func.coalesce(func.sum(ReceivablePayment.amount), 0)).where(ReceivablePayment.receivable_id == receivable_id))
     def add(self, item): self.db.add(item); self.db.flush(); return item
+    def delete(self, item): self.db.delete(item)

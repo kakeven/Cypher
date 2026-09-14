@@ -58,7 +58,19 @@ export const api = {
   receivables: () => request('/receivables'),
   receivable: (id) => request(`/receivables/${id}`),
   createReceivable: (data) => request('/receivables', { method: 'POST', body: JSON.stringify(data) }),
+  updateReceivable: (id, data) => request(`/receivables/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteReceivable: (id) => request(`/receivables/${id}`, { method: 'DELETE' }),
   addReceivablePayment: (id, data) => request(`/receivables/${id}/payments`, { method: 'POST', body: JSON.stringify(data) }),
+  recurringTransactions: () => request('/recurring-transactions'),
+  createRecurringTransaction: (data) => request('/recurring-transactions', { method: 'POST', body: JSON.stringify(data) }),
+  updateRecurringTransaction: (id, data) => request(`/recurring-transactions/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  pauseRecurringTransaction: (id) => request(`/recurring-transactions/${id}/pause`, { method: 'POST' }),
+  resumeRecurringTransaction: (id) => request(`/recurring-transactions/${id}/resume`, { method: 'POST' }),
+  generateOccurrences: (id) => request(`/recurring-transactions/${id}/generate-occurrences`, { method: 'POST' }),
+  deleteRecurringTransaction: (id) => request(`/recurring-transactions/${id}`, { method: 'DELETE' }),
+  occurrences: (params = {}) => request(`/occurrences${Object.keys(params).length ? `?${new URLSearchParams(params)}` : ''}`),
+  occurrenceSummary: (period) => request(`/occurrences/summary?period=${period}`),
+  confirmOccurrence: (id) => request(`/occurrences/${id}/confirm`, { method: 'POST' }),
 }
 
 export { brl } from '@/utils/format'

@@ -13,3 +13,7 @@ frontend/dist/
 **/*.pid
 
 .kilo
+
+graphify-out/
+
+.codex/

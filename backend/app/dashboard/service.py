@@ -14,7 +14,7 @@ class DashboardService:
         year, month = map(int, value.split("-")); return year, month, date(year, month, 1), date(year, month, monthrange(year, month)[1])
     def dashboard(self, period):
         value = period or date.today().strftime("%Y-%m"); year, _, start, end = self.bounds(value); all_items = self.repo.transactions(); current = [item for item in all_items if start <= item.date <= end]
-        income = sum((item.amount for item in current if item.type == "income"), Decimal("0")); expense = sum((item.amount for item in current if item.type == "expense"), Decimal("0")); balance = sum((item.amount if item.type == "income" else -item.amount for item in all_items), Decimal("0")); by_category = {}
+        income = sum((item.amount for item in current if item.type == "income"), Decimal("0")); expense = sum((item.amount for item in current if item.type == "expense"), Decimal("0")); goal_deposits = sum((item.amount for item in self.repo.goal_deposits()), Decimal("0")); balance = sum((item.amount if item.type == "income" else -item.amount for item in all_items), Decimal("0")) - goal_deposits; by_category = {}
         for item in current:
             if item.type == "expense": by_category[item.category.name] = by_category.get(item.category.name, Decimal("0")) + item.amount
         months = [{"month": f"{year}-{current_month:02d}", "income": money(sum((x.amount for x in all_items if x.date.year == year and x.date.month == current_month and x.type == "income"), Decimal("0"))), "expense": money(sum((x.amount for x in all_items if x.date.year == year and x.date.month == current_month and x.type == "expense"), Decimal("0")))} for current_month in range(1, 13)]

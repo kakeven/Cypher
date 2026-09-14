@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { api, brl } from '@/services/api'
 import { useToast } from '@/composables/useToast'
 import { formatDateBR, todayISO } from '@/utils/format'
@@ -13,6 +13,8 @@ const loading = ref(false)
 const today = todayISO()
 const form = reactive({ name: '', client: '', total_amount: '', service_type: '' })
 const payment = reactive({ amount: '', received_on: today, note: '' })
+const editingId = ref(null)
+const contextMenu = ref(null)
 
 const totalPending = computed(() => items.value.reduce((total, item) => total + Number(item.remaining_amount), 0))
 const totalReceived = computed(() => items.value.reduce((total, item) => total + Number(item.received_amount), 0))
@@ -35,11 +37,55 @@ async function load() {
 async function create() {
   error.value = ''
   try {
-    const created = await api.createReceivable({ ...form, total_amount: Number(form.total_amount), client: form.client.trim() || null })
-    Object.assign(form, { name: '', client: '', total_amount: '', service_type: '' })
+    const isEditing = Boolean(editingId.value)
+    const payload = { ...form, total_amount: Number(form.total_amount), client: form.client.trim() || null }
+    const created = isEditing
+      ? await api.updateReceivable(editingId.value, payload)
+      : await api.createReceivable(payload)
+    resetForm()
     await load()
     await choose(created)
-    toast.success('Recebível criado.')
+    toast.success(isEditing ? 'Recebível atualizado.' : 'Recebível criado.')
+  } catch (e) {
+    error.value = e.message
+  }
+}
+
+function resetForm() {
+  editingId.value = null
+  Object.assign(form, { name: '', client: '', total_amount: '', service_type: '' })
+}
+
+function openContextMenu(event, item) {
+  contextMenu.value = {
+    item,
+    x: Math.min(event.clientX, window.innerWidth - 168),
+    y: Math.min(event.clientY, window.innerHeight - 100),
+  }
+}
+
+function closeContextMenu() {
+  contextMenu.value = null
+}
+
+function editReceivable() {
+  const item = contextMenu.value?.item
+  if (!item) return
+  editingId.value = item.id
+  Object.assign(form, { name: item.name, client: item.client || '', total_amount: item.total_amount, service_type: item.service_type })
+  closeContextMenu()
+}
+
+async function deleteReceivable() {
+  const item = contextMenu.value?.item
+  if (!item || !window.confirm(`Excluir “${item.name}”? Os recebimentos registrados também serão removidos.`)) return
+  closeContextMenu()
+  error.value = ''
+  try {
+    await api.deleteReceivable(item.id)
+    if (selected.value?.id === item.id) selected.value = null
+    await load()
+    toast.success('Recebível excluído.')
   } catch (e) {
     error.value = e.message
   }
@@ -66,7 +112,16 @@ async function addPayment() {
   }
 }
 
-onMounted(load)
+onMounted(() => {
+  load()
+  window.addEventListener('click', closeContextMenu)
+  window.addEventListener('scroll', closeContextMenu, true)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('click', closeContextMenu)
+  window.removeEventListener('scroll', closeContextMenu, true)
+})
 </script>
 
 <template>
@@ -85,7 +140,7 @@ onMounted(load)
     <p v-if="error" class="message" role="alert">{{ error }}</p>
 
     <section class="card form">
-      <h2>Novo valor a receber</h2>
+      <h2>{{ editingId ? 'Editar recebível' : 'Novo valor a receber' }}</h2>
       <form class="form-grid" @submit.prevent="create">
         <label>
           Projeto ou serviço
@@ -109,7 +164,10 @@ onMounted(load)
             <option>Landing page</option>
           </select>
         </label>
-        <div class="actions"><button class="button">Adicionar recebível</button></div>
+        <div class="actions">
+          <button class="button">{{ editingId ? 'Salvar alterações' : 'Adicionar recebível' }}</button>
+          <button v-if="editingId" type="button" class="button button--ghost" @click="resetForm">Cancelar</button>
+        </div>
       </form>
     </section>
 
@@ -118,7 +176,7 @@ onMounted(load)
 
     <section v-else class="receivable-workspace">
       <aside class="receivable-list" aria-label="Projetos a receber">
-        <button v-for="item in items" :key="item.id" :class="['receivable', { active: selected?.id === item.id, paid: item.is_paid }]" type="button" @click="choose(item)">
+        <button v-for="item in items" :key="item.id" :class="['receivable', { active: selected?.id === item.id, paid: item.is_paid }]" type="button" @click="choose(item)" @contextmenu.prevent="openContextMenu($event, item)">
           <span class="receivable-kind">{{ item.service_type }}</span>
           <b>{{ item.name }}</b>
           <small>{{ item.client || 'Cliente não informado' }}</small>
@@ -153,6 +211,11 @@ onMounted(load)
         <p v-else class="empty">Ainda não há recebimentos registrados.</p>
       </section>
     </section>
+
+    <div v-if="contextMenu" class="context-menu" :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }" role="menu" @click.stop>
+      <button type="button" role="menuitem" @click="editReceivable">Editar</button>
+      <button type="button" class="danger" role="menuitem" @click="deleteReceivable">Excluir</button>
+    </div>
   </div>
 </template>
 
@@ -189,6 +252,10 @@ onMounted(load)
 .payment-list small { color: var(--color-text-muted); }
 .payment-list b { color: var(--color-success); font-family: var(--font-mono); letter-spacing: -0.04em; }
 .paid-message { color: var(--color-success); }
+.context-menu { position: fixed; z-index: 10; display: grid; width: 160px; padding: 4px; border: 1px solid var(--color-border-strong); border-radius: 7px; background: var(--color-surface-raised); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28); }
+.context-menu button { border: 0; border-radius: 4px; padding: 8px 10px; color: var(--color-text-primary); text-align: left; background: transparent; cursor: pointer; font-size: 13px; }
+.context-menu button:hover { background: var(--color-surface); }
+.context-menu .danger { color: var(--color-danger); }
 
 .form { margin-bottom: 12px; }
 .summary-values { gap: 12px; }

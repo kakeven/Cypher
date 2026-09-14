@@ -6,7 +6,7 @@
 
 Cypher é um MVP local de finanças pessoais. No estado atual, ele roda como dois processos de desenvolvimento: uma SPA Vue 3/Vite em `localhost:5173` e uma API FastAPI em `localhost:8000`. Os dados persistem em SQLite; o frontend consome a API por HTTP.
 
-O produto já cobre transações, categorias e orçamento mensal, painel consolidado, metas com depósitos e recebíveis com baixas parciais. Ainda não há aplicação Electron, instalador ou subprocesso Python embarcado.
+O produto já cobre transações, categorias e orçamento mensal, painel consolidado, metas com depósitos, recebíveis com baixas parciais e recorrências com agenda de ocorrências previstas. Ainda não há aplicação Electron, instalador ou subprocesso Python embarcado.
 
 ## Stack e execução
 
@@ -43,6 +43,7 @@ Cypher/
 │   │   ├── dashboard/             # consultas consolidadas
 │   │   ├── goals/                 # meta e depósito: model, schema, repository, service, router
 │   │   ├── receivables/           # recebível e baixa: model, schema, repository, service, router
+│   │   ├── recurring/              # recorrência e ocorrência: model, schema, repository, service, router
 │   │   └── factory.py             # composição e startup da aplicação
 │   ├── tests/test_api.py
 │   ├── requirements.txt
@@ -86,7 +87,7 @@ Regras de negócio efetivamente aplicadas:
 
 - transações e baixas não aceitam data futura;
 - transações aceitam apenas `income` ou `expense`, valor positivo e categoria existente;
-- saldo é calculado a partir das transações, nunca persistido;
+- saldo disponível é calculado a partir das transações, descontando depósitos de metas, e nunca persistido;
 - nomes de categoria são únicos sem diferenciar maiúsculas/minúsculas;
 - depósitos de meta compõem o progresso e marcam `is_completed` ao atingir a meta;
 - cada baixa de recebível cria uma transação de receita vinculada, na categoria interna `Outros`; a baixa não pode ultrapassar o valor pendente;
@@ -117,7 +118,16 @@ Todos usam o prefixo `/api`.
 | GET | `/receivables` | Lista recebíveis com totais e progresso |
 | POST | `/receivables` | Cria recebível |
 | GET | `/receivables/{id}` | Detalha recebível e baixas |
+| PUT | `/receivables/{id}` | Atualiza recebível |
+| DELETE | `/receivables/{id}` | Exclui recebível, baixas e receitas vinculadas (`204`) |
 | POST | `/receivables/{id}/payments` | Registra baixa parcial e cria receita vinculada |
+| GET/POST | `/recurring-transactions` | Lista ou cria recorrências |
+| PUT/DELETE | `/recurring-transactions/{id}` | Atualiza ou exclui recorrência |
+| POST | `/recurring-transactions/{id}/pause`, `/resume` | Pausa ou reativa uma recorrência |
+| POST | `/recurring-transactions/{id}/generate-occurrences` | Gera ocorrências previstas, por padrão para 12 meses |
+| GET | `/occurrences` | Lista ocorrências por período, tipo e status |
+| GET | `/occurrences/summary` | Resume previsto e realizado no período |
+| POST | `/occurrences/{id}/confirm` | Cria a transação real e confirma a ocorrência |
 
 Erros de domínio retornam `detail` em português com os códigos adequados, como `404`, `409` e `422`. Validações de contrato do Pydantic também retornam `422`.
 
@@ -127,9 +137,10 @@ Erros de domínio retornam `detail` em português com os códigos adequados, com
 - Rotas ativas: `/dashboard`, `/transacoes`, `/orcamentos`, `/metas` e `/recebimentos`; `/` e rotas desconhecidas redirecionam para `/dashboard`.
 - Dashboard consome os agregados da API.
 - Transações têm formulário, filtros, edição, exclusão com confirmação e store Pinia dedicado (`transactions`).
-- Orçamentos permitem definir/remover limites e exibem gasto/progresso por categoria.
-- Metas permitem criar, editar, excluir, selecionar o detalhe e incluir depósitos.
-- Recebimentos permitem criar projeto/serviço, acompanhar o saldo pendente e registrar baixas parciais.
+- Orçamentos permitem definir/remover limites, editar ou excluir um limite pelo menu de contexto e exibem gasto/progresso por categoria.
+- Metas carregam os registros existentes ao abrir a tela e permitem criar, editar, excluir, selecionar o detalhe e incluir depósitos.
+- Recebimentos permitem criar, editar e excluir projeto/serviço pelo menu de contexto, acompanhar o saldo pendente e registrar baixas parciais.
+- Agenda e recorrências permitem cadastrar receitas/despesas diárias, semanais, mensais ou anuais, gerar ocorrências previstas, pausar/reativar e confirmar ocorrências vencidas. A confirmação cria a transação real; o previsto não altera o saldo.
 - Cliente HTTP centralizado em `src/services/api.js`, incluindo normalização de mensagens de erro em português.
 - Tema escuro com tokens CSS em `src/assets/variaveis.css`; a aplicação impõe largura mínima de 1024px, portanto não é responsiva para mobile.
 
@@ -151,7 +162,6 @@ Prioridades e escopo devem ser confirmados contra o documento de requisitos e `s
 | Alertas de orçamento | Não há regra/interface específica para aviso de 80% ou estouro de limite |
 | Investimentos | Sem modelos, endpoints, telas, gráficos, `yfinance` ou cache de cotações |
 | Simulações | Sem cálculos de juros, aposentadoria, metas ou Monte Carlo |
-| Recorrências | Sem modelos, geração de ocorrências, agenda ou confirmação de vencimentos |
 | Notificações | Sem scheduler, preferências ou notificações locais/web |
 | Cartão, sync bancário e mobile | Fora da implementação atual |
 | Desktop distribuível | Sem diretório Electron, `electron-builder`, runtime Python empacotado ou instaladores |

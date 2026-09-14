@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { api, brl } from '@/services/api'
 import { useToast } from '@/composables/useToast'
 import { currentMonth, formatDateBR } from '@/utils/format'
@@ -116,6 +116,8 @@ const completedCount = computed(() => goals.value.filter((goal) => goal.is_compl
 watch(editing, (value) => {
   if (value === null) error.value = ''
 })
+
+onMounted(load)
 </script>
 
 <template>

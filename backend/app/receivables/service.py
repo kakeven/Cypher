@@ -25,6 +25,17 @@ class ReceivableService:
     def get(self, item_id): return self.output(self.require(item_id), True)
     def create(self, data):
         category = self.categories.receivable_category(); item = self.repo.add(Receivable(name=data.name.strip(), client=data.client.strip() if data.client else None, total_amount=data.total_amount, service_type=data.service_type, category_id=category.id)); self.db.commit(); self.db.refresh(item); return self.output(item)
+    def update(self, item_id, data):
+        item = self.require(item_id); received = self.repo.received_amount(item_id)
+        if data.total_amount < received: raise DomainError(422, "O valor total não pode ser menor que o já recebido.")
+        item.name, item.client, item.total_amount, item.service_type = data.name.strip(), data.client.strip() if data.client else None, data.total_amount, data.service_type
+        self.db.commit(); self.db.refresh(item); return self.output(item)
+    def delete(self, item_id):
+        item = self.require(item_id); transactions = TransactionRepository(self.db)
+        for payment in self.repo.payments(item_id):
+            transaction = transactions.get(payment.transaction_id)
+            if transaction: transactions.delete(transaction)
+        self.repo.delete(item); self.db.commit()
     def add_payment(self, item_id, data):
         item = self.require(item_id); received = self.repo.received_amount(item_id)
         if data.amount > item.total_amount - received: raise DomainError(422, "O recebimento não pode ser maior que o valor pendente.")
