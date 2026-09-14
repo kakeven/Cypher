@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { api, brl } from '@/services/api'
 import { useToast } from '@/composables/useToast'
 import { currentMonth, formatDateBR } from '@/utils/format'
@@ -94,14 +94,22 @@ async function addDeposit() {
   }
 }
 
-const pendingDelete = ref(null)
-function askRemove(goal) { pendingDelete.value = goal.id }
-function cancelRemove() { pendingDelete.value = null }
-async function confirmRemove(goal) {
+const contextMenu = ref(null)
+function openContextMenu(event, goal) { contextMenu.value = { item: goal, x: Math.min(event.clientX, window.innerWidth - 168), y: Math.min(event.clientY, window.innerHeight - 100) } }
+function closeContextMenu() { contextMenu.value = null }
+function editGoal() {
+  const goal = contextMenu.value?.item
+  if (!goal) return
+  closeContextMenu()
+  edit(goal)
+}
+async function deleteGoal() {
+  const goal = contextMenu.value?.item
+  closeContextMenu()
+  if (!goal || !window.confirm(`Excluir a meta “${goal.name}”? Os depósitos também serão removidos.`)) return
   try {
     await api.deleteGoal(goal.id)
     if (selected.value?.id === goal.id) selected.value = null
-    pendingDelete.value = null
     toast.success('Meta excluída.')
     await load()
   } catch (e) {
@@ -117,7 +125,16 @@ watch(editing, (value) => {
   if (value === null) error.value = ''
 })
 
-onMounted(load)
+onMounted(() => {
+  load()
+  window.addEventListener('click', closeContextMenu)
+  window.addEventListener('scroll', closeContextMenu, true)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('click', closeContextMenu)
+  window.removeEventListener('scroll', closeContextMenu, true)
+})
 </script>
 
 <template>
@@ -171,6 +188,7 @@ onMounted(load)
           :key="goal.id"
           class="card goal"
           :class="{ active: selected?.id === goal.id, completed: goal.is_completed }"
+          @contextmenu.prevent="openContextMenu($event, goal)"
         >
           <div class="goal-title">
             <h2>{{ goal.name }}</h2>
@@ -186,16 +204,15 @@ onMounted(load)
           </p>
           <footer>
             <button type="button" class="link" @click="choose(goal)">Ver depósitos</button>
-            <button type="button" class="link" @click="edit(goal)">Editar</button>
-            <template v-if="pendingDelete === goal.id">
-              <button type="button" class="link link--danger" @click="confirmRemove(goal)">Confirmar</button>
-              <button type="button" class="link" @click="cancelRemove">Cancelar</button>
-            </template>
-            <button v-else type="button" class="link link--danger" @click="askRemove(goal)">Excluir</button>
           </footer>
         </article>
       </div>
     </section>
+
+    <div v-if="contextMenu" class="context-menu" :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }" role="menu" @click.stop>
+      <button type="button" role="menuitem" @click="editGoal">Editar</button>
+      <button type="button" class="danger" role="menuitem" @click="deleteGoal">Excluir</button>
+    </div>
 
     <section v-if="selected" class="card details" aria-live="polite">
       <h2>{{ selected.name }} — depósitos</h2>
@@ -248,4 +265,8 @@ onMounted(load)
 .details li { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--color-border); color: var(--color-text-secondary); }
 .details li small { color: var(--color-text-muted); }
 .details li b { color: var(--color-success); }
+.context-menu { position: fixed; z-index: 10; display: grid; width: 160px; padding: 4px; border: 1px solid var(--color-border-strong); border-radius: 7px; background: var(--color-surface-raised); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28); }
+.context-menu button { border: 0; border-radius: 4px; padding: 8px 10px; color: var(--color-text-primary); text-align: left; background: transparent; cursor: pointer; font-size: 13px; }
+.context-menu button:hover { background: var(--color-surface); }
+.context-menu .danger { color: var(--color-danger); }
 </style>

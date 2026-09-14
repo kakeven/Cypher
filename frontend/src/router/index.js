@@ -6,6 +6,7 @@ const BudgetsView = () => import('@/views/BudgetsView.vue')
 const GoalsView = () => import('@/views/GoalsView.vue')
 const ReceivablesView = () => import('@/views/ReceivablesView.vue')
 const RecurringView = () => import('@/views/RecurringView.vue')
+const CreditCardsView = () => import('@/views/CreditCardsView.vue')
 
 const routes = [
   { path: '/', redirect: '/dashboard' },
@@ -15,6 +16,7 @@ const routes = [
   { path: '/metas', component: GoalsView, meta: { title: 'Metas' } },
   { path: '/recebimentos', component: ReceivablesView, meta: { title: 'Recebimentos' } },
   { path: '/recorrencias', component: RecurringView, meta: { title: 'Agenda e recorrências' } },
+  { path: '/cartoes', component: CreditCardsView, meta: { title: 'Cartões' } },
   { path: '/:pathMatch(.*)*', redirect: '/dashboard' },
 ]
 

@@ -39,7 +39,9 @@ async function request(path, options = {}) {
 export const api = {
   categories: () => request('/categories'),
   createCategory: (data) => request('/categories', { method: 'POST', body: JSON.stringify(data) }),
+  updateCategory: (id, data) => request(`/categories/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   setBudget: (id, budget_limit) => request(`/categories/${id}/budget`, { method: 'PUT', body: JSON.stringify({ budget_limit }) }),
+  deleteCategory: (id) => request(`/categories/${id}`, { method: 'DELETE' }),
   transactions: (params = {}) => {
     const search = new URLSearchParams(params).toString()
     return request(`/transactions${search ? `?${search}` : ''}`)
@@ -71,6 +73,15 @@ export const api = {
   occurrences: (params = {}) => request(`/occurrences${Object.keys(params).length ? `?${new URLSearchParams(params)}` : ''}`),
   occurrenceSummary: (period) => request(`/occurrences/summary?period=${period}`),
   confirmOccurrence: (id) => request(`/occurrences/${id}/confirm`, { method: 'POST' }),
+  creditCards: () => request('/credit-cards'),
+  createCreditCard: (data) => request('/credit-cards', { method: 'POST', body: JSON.stringify(data) }),
+  creditCard: (id) => request(`/credit-cards/${id}`),
+  importCreditCardCsv: (id, data) => request(`/credit-cards/${id}/import-csv`, { method: 'POST', body: JSON.stringify(data) }),
+  creditCardInvoice: (id) => request(`/credit-cards/invoices/${id}`),
+  deleteCreditCardInvoice: (id) => request(`/credit-cards/invoices/${id}`, { method: 'DELETE' }),
+  addCreditCardInvoicePayment: (id, data) => request(`/credit-cards/invoices/${id}/payments`, { method: 'POST', body: JSON.stringify(data) }),
+  setCreditCardPurchaseCategory: (id, category_id) => request(`/credit-cards/purchases/${id}/category`, { method: 'PUT', body: JSON.stringify({ category_id }) }),
+  payCreditCardInvoice: (id, data) => request(`/credit-cards/invoices/${id}/pay`, { method: 'POST', body: JSON.stringify(data) }),
 }
 
 export { brl } from '@/utils/format'

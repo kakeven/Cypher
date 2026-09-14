@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 
 from ..core.database import get_db
@@ -20,5 +20,11 @@ def list_categories(db: Session = Depends(get_db)): return CategoryService(db).l
 @router.post("", status_code=201)
 def create_category(body: CategoryIn, db: Session = Depends(get_db)): return call(lambda: CategoryService(db).create(body))
 
+@router.put("/{category_id}")
+def update_category(category_id: int, body: CategoryIn, db: Session = Depends(get_db)): return call(lambda: CategoryService(db).update(category_id, body))
+
 @router.put("/{category_id}/budget")
 def update_budget(category_id: int, body: BudgetIn, db: Session = Depends(get_db)): return call(lambda: CategoryService(db).update_budget(category_id, body))
+
+@router.delete("/{category_id}")
+def delete_category(category_id: int, db: Session = Depends(get_db)): return call(lambda: CategoryService(db).delete(category_id))

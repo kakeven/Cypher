@@ -52,6 +52,7 @@ defineEmits(['update:modelValue', 'change'])
   display: inline-flex;
   align-items: center;
   width: 100%;
+  min-width: 190px;
 }
 .date-input__field {
   width: 100%;

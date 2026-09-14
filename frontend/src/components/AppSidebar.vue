@@ -6,6 +6,7 @@ const links = [
   { to: '/metas', label: 'Metas' },
   { to: '/recebimentos', label: 'Recebimentos' },
   { to: '/recorrencias', label: 'Agenda' },
+  { to: '/cartoes', label: 'Cartões' },
 ]
 </script>
 

@@ -6,7 +6,7 @@
 
 Cypher é um MVP local de finanças pessoais. No estado atual, ele roda como dois processos de desenvolvimento: uma SPA Vue 3/Vite em `localhost:5173` e uma API FastAPI em `localhost:8000`. Os dados persistem em SQLite; o frontend consome a API por HTTP.
 
-O produto já cobre transações, categorias e orçamento mensal, painel consolidado, metas com depósitos, recebíveis com baixas parciais e recorrências com agenda de ocorrências previstas. Ainda não há aplicação Electron, instalador ou subprocesso Python embarcado.
+O produto já cobre transações, categorias e orçamento mensal, painel consolidado, metas com depósitos, recebíveis com baixas parciais, recorrências com agenda de ocorrências previstas e cartões de crédito com importação CSV Nubank. Ainda não há aplicação Electron, instalador ou subprocesso Python embarcado.
 
 ## Stack e execução
 
@@ -15,7 +15,7 @@ O produto já cobre transações, categorias e orçamento mensal, painel consoli
 | Frontend | Vue 3.5, Vite 8, Vue Router 5 e Pinia 3 |
 | Backend | Python, FastAPI, Uvicorn, SQLAlchemy 2 e Pydantic v2 |
 | Banco | SQLite; URL configurada por `CYPHER_DATABASE_URL` |
-| Testes | pytest + FastAPI TestClient/httpx (backend); 15 testes passam no container em 12/09/2026 |
+| Testes | pytest + FastAPI TestClient/httpx (backend); 27 testes passam no container em 13/09/2026 |
 | Ambiente de desenvolvimento | Docker Compose com hot reload do Uvicorn e Vite HMR |
 
 ```powershell
@@ -39,6 +39,7 @@ Cypher/
 │   ├── app/
 │   │   ├── core/                  # base ORM, sessão, erros e valores monetários
 │   │   ├── categories/            # categoria: model, schema, repository, service, router
+│   │   ├── cards/                 # cartão, fatura e compras importadas: model, schema, repository, service, router
 │   │   ├── transactions/          # transação: model, schema, repository, service, router
 │   │   ├── dashboard/             # consultas consolidadas
 │   │   ├── goals/                 # meta e depósito: model, schema, repository, service, router
@@ -78,7 +79,8 @@ Cypher/
   - `Category(id, name, color, budget_limit)`;
   - `Transaction(id, date, type, amount, category_id, description, created_at)`;
   - `Goal(id, name, target_amount, deadline, description, created_at)` e `GoalDeposit`;
-  - `Receivable(id, name, client, total_amount, service_type, category_id, created_at)` e `ReceivablePayment`.
+- `Receivable(id, name, client, total_amount, service_type, category_id, created_at)` e `ReceivablePayment`.
+- `CreditCard(id, name, brand, credit_limit, closing_day, due_day)`, `CreditCardInvoice`, `CreditCardPurchase` e `CreditCardInvoicePayment`.
 - Compatibilidade pontual no startup: adiciona `service_type` à tabela antiga `receivables` quando a coluna não existe.
 - Valores são armazenados como `Decimal`/`Numeric(12,2)` e serializados como número JSON.
 - CORS restrito a `http://localhost:5173` e `http://127.0.0.1:5173`.
@@ -86,12 +88,15 @@ Cypher/
 Regras de negócio efetivamente aplicadas:
 
 - transações e baixas não aceitam data futura;
-- transações aceitam apenas `income` ou `expense`, valor positivo e categoria existente;
+- transações aceitam apenas `income` ou `expense` e valor positivo; categoria é obrigatória somente para despesas e receitas são vinculadas internamente a `Outros`;
 - saldo disponível é calculado a partir das transações, descontando depósitos de metas, e nunca persistido;
 - nomes de categoria são únicos sem diferenciar maiúsculas/minúsculas;
 - depósitos de meta compõem o progresso e marcam `is_completed` ao atingir a meta;
 - cada baixa de recebível cria uma transação de receita vinculada, na categoria interna `Outros`; a baixa não pode ultrapassar o valor pendente;
 - tipos de serviço de recebível são limitados a Site institucional, Sistema, E-commerce e Landing page.
+- importação Nubank aceita CSV com `date`, `title` e `amount`, ignora lançamentos de `Pagamento recebido`, normaliza estornos, reconhece parcelas e bloqueia compras já importadas pelo identificador derivado do lançamento;
+- pagamentos de fatura podem ser integrais ou parciais e identificam quem pagou; somente a parte paga pelo titular cria despesa no saldo. Pagamentos de terceiros reduzem exclusivamente o saldo pendente da fatura;
+- compras de cartão permanecem nos relatórios da fatura e os pagamentos feitos pelo titular são excluídos desses relatórios para evitar dupla contagem.
 
 ### Endpoints expostos
 
@@ -102,7 +107,9 @@ Todos usam o prefixo `/api`.
 | GET | `/health` | Verifica a disponibilidade da API e retorna `{"status":"ok"}` |
 | GET | `/categories` | Lista categorias |
 | POST | `/categories` | Cria categoria |
+| PUT | `/categories/{id}` | Altera nome e cor da categoria |
 | PUT | `/categories/{id}/budget` | Define ou limpa o limite mensal |
+| DELETE | `/categories/{id}` | Exclui categoria sem uso ou a arquiva quando há histórico |
 | GET | `/transactions` | Lista transações; filtros opcionais `date_from`, `date_to`, `category_id` e `type` |
 | POST | `/transactions` | Cria transação |
 | PUT | `/transactions/{id}` | Atualiza transação |
@@ -128,6 +135,14 @@ Todos usam o prefixo `/api`.
 | GET | `/occurrences` | Lista ocorrências por período, tipo e status |
 | GET | `/occurrences/summary` | Resume previsto e realizado no período |
 | POST | `/occurrences/{id}/confirm` | Cria a transação real e confirma a ocorrência |
+| GET/POST | `/credit-cards` | Lista ou cadastra cartões |
+| GET | `/credit-cards/{id}` | Detalha cartão e faturas |
+| POST | `/credit-cards/{id}/import-csv` | Importa CSV Nubank para a fatura selecionada |
+| GET | `/credit-cards/invoices/{id}` | Detalha fatura e compras |
+| DELETE | `/credit-cards/invoices/{id}` | Exclui uma fatura aberta e suas compras importadas |
+| POST | `/credit-cards/invoices/{id}/payments` | Registra pagamento parcial, com pagador e efeito correto no saldo |
+| PUT | `/credit-cards/purchases/{id}/category` | Define a categoria de uma compra |
+| POST | `/credit-cards/invoices/{id}/pay` | Quita o restante da fatura, identificando quem realizou o pagamento |
 
 Erros de domínio retornam `detail` em português com os códigos adequados, como `404`, `409` e `422`. Validações de contrato do Pydantic também retornam `422`.
 
@@ -135,12 +150,13 @@ Erros de domínio retornam `detail` em português com os códigos adequados, com
 
 - Shell de desktop com sidebar fixa, título dinâmico por rota e toaster global.
 - Rotas ativas: `/dashboard`, `/transacoes`, `/orcamentos`, `/metas` e `/recebimentos`; `/` e rotas desconhecidas redirecionam para `/dashboard`.
-- Dashboard consome os agregados da API.
-- Transações têm formulário, filtros, edição, exclusão com confirmação e store Pinia dedicado (`transactions`).
-- Orçamentos permitem definir/remover limites, editar ou excluir um limite pelo menu de contexto e exibem gasto/progresso por categoria.
-- Metas carregam os registros existentes ao abrir a tela e permitem criar, editar, excluir, selecionar o detalhe e incluir depósitos.
-- Recebimentos permitem criar, editar e excluir projeto/serviço pelo menu de contexto, acompanhar o saldo pendente e registrar baixas parciais.
-- Agenda e recorrências permitem cadastrar receitas/despesas diárias, semanais, mensais ou anuais, gerar ocorrências previstas, pausar/reativar e confirmar ocorrências vencidas. A confirmação cria a transação real; o previsto não altera o saldo.
+- Dashboard consome os agregados da API e exibe o fluxo mensal de receitas e despesas em linhas separadas, além de uma rosquinha interativa de gastos por categoria, com legenda percentual, valores e atalho para o histórico filtrado. O card de despesas abate a parte da fatura que foi paga por terceiros.
+- Transações têm formulário, filtros, edição e exclusão pelo menu de contexto com confirmação, além de store Pinia dedicado (`transactions`); receitas não pedem categoria na interface.
+- Orçamentos permitem definir limites, editar nome/cor, resetar o orçamento ou excluir uma categoria pelo menu de contexto; categorias com histórico são arquivadas e preservam lançamentos antigos.
+- Metas carregam os registros existentes ao abrir a tela e permitem criar, editar e excluir pelo menu de contexto com confirmação, selecionar o detalhe e incluir depósitos.
+- Recebimentos permitem criar, editar e excluir projeto/serviço pelo menu de contexto com confirmação, acompanhar o saldo pendente e registrar baixas parciais.
+- Agenda e recorrências permitem cadastrar receitas/despesas diárias, semanais, mensais ou anuais, gerar ocorrências previstas, pausar/reativar e editar/excluir pelo menu de contexto com confirmação. A confirmação cria a transação real; o previsto não altera o saldo.
+- Cartões permitem cadastrar dados do cartão, importar o CSV Nubank localmente, conferir compras/estornos/parcelas, categorizar compras, excluir faturas abertas e registrar pagamento total ou parcial. Em ambos os modos, o usuário define se pagou ou se foi outra pessoa; apenas o próprio pagamento reduz o saldo. Compras categorizadas entram no orçamento e no ranking de gastos no mês de referência da fatura; o pagamento não é contado novamente nesses relatórios.
 - Cliente HTTP centralizado em `src/services/api.js`, incluindo normalização de mensagens de erro em português.
 - Tema escuro com tokens CSS em `src/assets/variaveis.css`; a aplicação impõe largura mínima de 1024px, portanto não é responsiva para mobile.
 
@@ -162,6 +178,7 @@ Prioridades e escopo devem ser confirmados contra o documento de requisitos e `s
 | Alertas de orçamento | Não há regra/interface específica para aviso de 80% ou estouro de limite |
 | Investimentos | Sem modelos, endpoints, telas, gráficos, `yfinance` ou cache de cotações |
 | Simulações | Sem cálculos de juros, aposentadoria, metas ou Monte Carlo |
+| Cartão de crédito | Não há edição/exclusão de cartão, fatura automática por fechamento, limites disponíveis, parcelamento consolidado ou integração com outros bancos; a importação CSV Nubank está implementada |
 | Notificações | Sem scheduler, preferências ou notificações locais/web |
 | Cartão, sync bancário e mobile | Fora da implementação atual |
 | Desktop distribuível | Sem diretório Electron, `electron-builder`, runtime Python empacotado ou instaladores |
@@ -178,7 +195,7 @@ Prioridades e escopo devem ser confirmados contra o documento de requisitos e `s
 5. Datas usam ISO `YYYY-MM-DD`; consultas e depósitos por mês usam `YYYY-MM`.
 6. Arquivos Vue usam PascalCase para componentes e views atuais; não reintroduzir os antigos componentes em `snake_case` removidos do diretório.
 7. O fluxo comercial de recebíveis não pede categoria financeira ao usuário; o backend vincula a receita criada à categoria `Outros`.
-8. Não adicionar dependências sem justificativa; o projeto usa pnpm no frontend e os requisitos Python declarados em `backend/requirements.txt`.
+8. Não adicionar dependências sem justificativa; o projeto usa pnpm no frontend e os requisitos Python declarados em `backend/requirements.txt`. A importação CSV do Nubank usa apenas a biblioteca padrão do Python.
 9. O host atual não tem `python` disponível no `PATH` e o `pnpm` local encontra `EPERM` em `frontend/node_modules`; use Docker Compose como ambiente de validação até que essas permissões/runtimes locais sejam corrigidos. O script `pnpm lint` também aplica `--fix`, portanto não deve ser usado como verificação puramente read-only.
 
 ## Observações para a próxima mudança

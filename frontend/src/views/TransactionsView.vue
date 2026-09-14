@@ -1,12 +1,15 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { api, brl } from '@/services/api'
 import { useTransactionsStore } from '@/stores/transactions'
 import { useToast } from '@/composables/useToast'
 import { todayISO, currentMonth, monthRange, formatDateBR } from '@/utils/format'
 import DateInput from '@/components/DateInput.vue'
+import DateRangePicker from '@/components/DateRangePicker.vue'
 
 const store = useTransactionsStore()
+const route = useRoute()
 const toast = useToast()
 const categories = ref([])
 const categoriesError = ref('')
@@ -26,7 +29,7 @@ function payload() {
     date: form.date,
     type: form.type,
     amount: Number(form.amount),
-    category_id: Number(form.category_id),
+    category_id: form.type === 'expense' ? Number(form.category_id) : null,
     description: form.description?.trim() || null,
   }
 }
@@ -75,17 +78,23 @@ function resetForm() {
   formError.value = ''
 }
 
-const pendingDelete = ref(null)
-function askRemove(item) {
-  pendingDelete.value = item.id
+const contextMenu = ref(null)
+function openContextMenu(event, item) {
+  contextMenu.value = { item, x: Math.min(event.clientX, window.innerWidth - 168), y: Math.min(event.clientY, window.innerHeight - 100) }
 }
-function cancelRemove() {
-  pendingDelete.value = null
+function closeContextMenu() { contextMenu.value = null }
+function editTransaction() {
+  const item = contextMenu.value?.item
+  if (!item) return
+  closeContextMenu()
+  startEdit(item)
 }
-async function confirmRemove(item) {
+async function deleteTransaction() {
+  const item = contextMenu.value?.item
+  closeContextMenu()
+  if (!item || !window.confirm(`Excluir a transação “${item.description || item.category_name}”?`)) return
   try {
     await store.remove(item.id)
-    pendingDelete.value = null
     toast.success('Transação excluída.')
   } catch (e) {
     formError.value = e.message
@@ -105,7 +114,18 @@ onMounted(async () => {
   } catch (e) {
     categoriesError.value = e.message
   }
-  await store.load()
+  filters.category_id = route.query.category_id || ''
+  filters.date_from = route.query.date_from || ''
+  filters.date_to = route.query.date_to || ''
+  filters.type = route.query.type || ''
+  await store.load({ ...filters })
+  window.addEventListener('click', closeContextMenu)
+  window.addEventListener('scroll', closeContextMenu, true)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('click', closeContextMenu)
+  window.removeEventListener('scroll', closeContextMenu, true)
 })
 </script>
 
@@ -138,7 +158,7 @@ onMounted(async () => {
           Data
           <DateInput v-model="form.date" required :max="today" aria-label="Data da transação" />
         </label>
-        <label>
+        <label v-if="form.type === 'expense'">
           Categoria
           <select v-model="form.category_id" required class="input" aria-required="true">
             <option disabled value="">Selecione</option>
@@ -161,7 +181,10 @@ onMounted(async () => {
 
     <section class="card list">
       <div class="list-header">
-        <h2>Histórico</h2>
+        <div class="history-heading">
+          <h2>Histórico</h2>
+          <p>Use o botão direito em um lançamento para editar ou excluir.</p>
+        </div>
         <div class="filters">
           <label class="sr-only" for="filter-type">Filtrar por tipo</label>
           <select id="filter-type" v-model="filters.type" class="input" @change="applyFilters">
@@ -176,10 +199,7 @@ onMounted(async () => {
               {{ category.name }}
             </option>
           </select>
-          <label class="sr-only" for="filter-from">Data inicial</label>
-          <DateInput id="filter-from" v-model="filters.date_from" :max="filters.date_to || today" aria-label="Data inicial" @change="applyFilters" />
-          <label class="sr-only" for="filter-to">Data final</label>
-          <DateInput id="filter-to" v-model="filters.date_to" :min="filters.date_from" :max="today" aria-label="Data final" @change="applyFilters" />
+          <DateRangePicker v-model:start="filters.date_from" v-model:end="filters.date_to" :max="today" @change="applyFilters" />
           <button v-if="filterActive" type="button" class="button button--ghost" @click="clearFilters">Limpar</button>
         </div>
       </div>
@@ -199,55 +219,60 @@ onMounted(async () => {
             <th scope="col">Categoria</th>
             <th scope="col">Tipo</th>
             <th scope="col" class="amount">Valor</th>
-            <th scope="col"><span class="sr-only">Ações</span></th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="item in store.items" :key="item.id">
-            <td>{{ formatDateBR(item.date) }}</td>
-            <td>{{ item.description || 'Sem descrição' }}</td>
-            <td>{{ item.category_name }}</td>
-            <td>{{ item.type === 'income' ? 'Receita' : 'Despesa' }}</td>
+          <tr v-for="item in store.items" :key="item.id" @contextmenu.prevent="openContextMenu($event, item)">
+            <td><time>{{ formatDateBR(item.date) }}</time></td>
+            <td class="description-cell">{{ item.description || 'Sem descrição' }}</td>
+            <td class="category-cell">{{ item.type === 'expense' ? item.category_name : '—' }}</td>
+            <td><span :class="['type-tag', item.type]">{{ item.type === 'income' ? 'Receita' : 'Despesa' }}</span></td>
             <td class="amount" :class="item.type === 'income' ? 'positive' : 'negative'">
               <span :aria-label="item.type === 'income' ? 'Receita de' : 'Despesa de'">{{ item.type === 'income' ? '+' : '-' }} {{ brl(item.amount) }}</span>
-            </td>
-            <td class="row-actions">
-              <template v-if="pendingDelete === item.id">
-                <button class="link link--danger" @click="confirmRemove(item)">Confirmar exclusão</button>
-                <button class="link" @click="cancelRemove">Cancelar</button>
-              </template>
-              <template v-else>
-                <button class="link" :aria-label="`Editar transação ${item.description || item.category_name}`" @click="startEdit(item)">Editar</button>
-                <button class="link link--danger" :aria-label="`Excluir transação ${item.description || item.category_name}`" @click="askRemove(item)">Excluir</button>
-              </template>
             </td>
           </tr>
         </tbody>
       </table>
     </section>
+    <div v-if="contextMenu" class="context-menu" :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }" role="menu" @click.stop>
+      <button type="button" role="menuitem" @click="editTransaction">Editar</button>
+      <button type="button" class="danger" role="menuitem" @click="deleteTransaction">Excluir</button>
+    </div>
   </div>
 </template>
 
 <style scoped>
 .form, .list { margin-bottom: 18px; }
-.form h2, .list h2 { font-size: 16px; margin: 0 0 18px; letter-spacing: -0.02em; }
+.form h2 { font-size: 16px; margin: 0 0 18px; letter-spacing: -0.02em; }
+.list { padding: 0; overflow: hidden; border-color: var(--color-border-strong); box-shadow: none; }
 .actions { display: flex; gap: 10px; }
 .message--inline { grid-column: 1 / -1; margin: 4px 0 0; }
-.list-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+.list-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 18px; padding: 18px 20px 14px; }
+.history-heading h2 { margin: 0; font-size: 16px; letter-spacing: -0.02em; }
+.history-heading p { margin: 5px 0 0; color: var(--color-text-muted); font-size: 11px; }
 .filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .filters .input { width: auto; min-width: 140px; }
-.quick-ranges { display: flex; gap: 8px; margin: 12px 0; }
-.chip { background: transparent; border: 1px solid var(--color-border); color: var(--color-text-secondary); padding: 6px 12px; border-radius: 999px; font-size: 12px; cursor: pointer; }
+.quick-ranges { display: flex; gap: 6px; margin: 0; padding: 0 20px 14px; border-bottom: 1px solid var(--color-border); }
+.chip { background: transparent; border: 1px solid transparent; color: var(--color-text-secondary); padding: 5px 9px; border-radius: 5px; font-size: 11px; cursor: pointer; }
 .chip:hover { color: var(--color-accent-bright); border-color: var(--color-accent); background: var(--color-accent-bg); }
-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-th, td { padding: 13px 8px; border-bottom: 1px solid var(--color-border); text-align: left; }
-th { color: var(--color-text-muted); font-family: var(--font-mono); font-size: 10px; font-weight: var(--font-weight-medium); letter-spacing: 0.03em; }
-tbody tr:hover { background: var(--color-surface-raised); }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { padding: 14px 20px; border-bottom: 1px solid var(--color-border); text-align: left; }
+th { color: var(--color-text-muted); background: rgba(255, 255, 255, 0.015); font-size: 10px; font-weight: var(--font-weight-medium); letter-spacing: 0.025em; }
+tbody tr { transition: background 0.14s ease, box-shadow 0.14s ease; }
+tbody tr:hover { background: var(--color-surface-raised); box-shadow: inset 2px 0 var(--color-accent); }
+tbody tr:last-child td { border-bottom: 0; }
+td time { color: var(--color-text-secondary); font-variant-numeric: tabular-nums; font-size: 12px; }
+.description-cell { color: var(--color-text-primary); font-weight: 520; }
+.category-cell { color: var(--color-text-secondary); }
+.type-tag { display: inline-flex; padding: 3px 7px; border: 1px solid currentColor; border-radius: 4px; font-size: 10px; font-weight: 600; line-height: 1.2; }
+.type-tag.income { color: var(--color-success); background: color-mix(in srgb, var(--color-success) 8%, transparent); }
+.type-tag.expense { color: var(--color-danger); background: color-mix(in srgb, var(--color-danger) 8%, transparent); }
 th.amount, td.amount { text-align: right; }
-.row-actions { text-align: right; white-space: nowrap; }
-.link { border: 0; background: none; color: var(--color-accent); cursor: pointer; padding: 0 6px; font-size: 13px; }
-.link:hover { color: var(--color-accent-bright); text-decoration: underline; text-underline-offset: 3px; }
-.link--danger { color: var(--color-danger); }
+.context-menu { position: fixed; z-index: 10; display: grid; width: 160px; padding: 4px; border: 1px solid var(--color-border-strong); border-radius: 7px; background: var(--color-surface-raised); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28); }
+.context-menu button { border: 0; border-radius: 4px; padding: 8px 10px; color: var(--color-text-primary); text-align: left; background: transparent; cursor: pointer; font-size: 13px; }
+.context-menu button:hover { background: var(--color-surface); }
+.context-menu .danger { color: var(--color-danger); }
 .positive { color: var(--color-success); }
 .negative { color: var(--color-danger); }
+@media (max-width: 1100px) { .list-header { align-items: start; } th, td { padding-left: 14px; padding-right: 14px; } .quick-ranges { padding-left: 14px; } }
 </style>

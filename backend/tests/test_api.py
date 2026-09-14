@@ -41,6 +41,17 @@ def test_creates_category_and_rejects_duplicate_name():
     assert duplicate.status_code == 409
 
 
+def test_updates_category_name_and_color_without_changing_budget():
+    created = client.post("/api/categories", json={"name": "Editável", "color": "#A855F7"}).json()
+    client.put(f"/api/categories/{created['id']}/budget", json={"budget_limit": 120})
+    updated = client.put(f"/api/categories/{created['id']}", json={"name": "Renomeada", "color": "#10B981"})
+    assert updated.status_code == 200
+    assert updated.json()["name"] == "Renomeada"
+    assert updated.json()["color"] == "#10B981"
+    assert updated.json()["budget_limit"] == 120.0
+    assert client.put(f"/api/categories/{created['id']}", json={"name": "Assinaturas", "color": "#10B981"}).status_code == 409
+
+
 def test_rejects_invalid_category_color():
     assert client.post("/api/categories", json={"name": "Pet", "color": "not-a-hex"}).status_code == 422
 
@@ -87,6 +98,12 @@ def test_rejects_invalid_type_and_missing_category():
     assert client.post("/api/transactions", json={"date": date.today().isoformat(), "type": "expense", "amount": 1, "category_id": 9999}).status_code == 404
 
 
+def test_income_does_not_require_category_but_expense_does():
+    income = client.post("/api/transactions", json={"date": date.today().isoformat(), "type": "income", "amount": 100, "description": "Freela"})
+    assert income.status_code == 201
+    assert client.post("/api/transactions", json={"date": date.today().isoformat(), "type": "expense", "amount": 100}).status_code == 422
+
+
 def test_transaction_filters_by_category_and_type():
     cat_a, cat_b = category_id(), second_category_id()
     today = date.today().isoformat()
@@ -128,6 +145,7 @@ def test_dashboard_aggregates_current_period_and_balance():
     assert dashboard["income"] >= 500
     assert dashboard["expense"] >= 200
     assert any(row["name"] for row in dashboard["by_category"])
+    assert all("id" in row and "color" in row for row in dashboard["by_category"])
     assert len(dashboard["monthly_evolution"]) == 12
 
 
@@ -225,3 +243,102 @@ def test_recurring_pause_prevents_generation():
     assert client.post(f"/api/recurring-transactions/{recurring['id']}/pause").json()["is_active"] is False
     assert client.post(f"/api/recurring-transactions/{recurring['id']}/generate-occurrences").status_code == 422
     assert client.post(f"/api/recurring-transactions/{recurring['id']}/resume").json()["is_active"] is True
+
+
+def test_nubank_csv_import_deduplicates_and_pays_invoice():
+    card = client.post("/api/credit-cards", json={"name": "Nubank", "brand": "Mastercard", "credit_limit": 5000, "closing_day": 24, "due_day": 1})
+    assert card.status_code == 201
+    content = "date,title,amount\n2026-08-11,Openai,\"41,61\"\n2026-08-09,Loja - Parcela 1/3,\"69,31\"\n2026-08-08,Estorno,\"- 10,00\"\n"
+    imported = client.post(f"/api/credit-cards/{card.json()['id']}/import-csv", json={"reference_month": "2026-08", "content": content})
+    assert imported.status_code == 200
+    assert imported.json()["imported"] == 3
+    invoice = imported.json()["invoice"]
+    assert invoice["total"] == 100.92
+    assert invoice["purchases"][1]["installment_current"] == 1
+    repeated = client.post(f"/api/credit-cards/{card.json()['id']}/import-csv", json={"reference_month": "2026-08", "content": content}).json()
+    assert repeated["imported"] == 0
+    assert repeated["duplicates"] == 3
+    paid = client.post(f"/api/credit-cards/invoices/{invoice['id']}/pay", json={"paid_on": date.today().isoformat(), "amount": 100.92, "paid_by_owner": True})
+    assert paid.status_code == 200
+    assert paid.json()["status"] == "paid"
+    assert any(item["id"] == paid.json()["payment_transaction_id"] and item["amount"] == 100.92 for item in client.get("/api/transactions").json())
+
+
+def test_nubank_csv_ignores_payment_received_and_keeps_refund():
+    card = client.post("/api/credit-cards", json={"name": "Nubank créditos", "closing_day": 24, "due_day": 1}).json()
+    content = "date,title,amount\n2026-08-11,Compra,100.00\n2026-08-10,Pagamento recebido,-100.00\n2026-08-09,Estorno de compra,-10.00\n"
+    imported = client.post(f"/api/credit-cards/{card['id']}/import-csv", json={"reference_month": "2026-08", "content": content}).json()
+    assert imported["imported"] == 2
+    assert imported["ignored"] == 1
+    assert imported["invoice"]["total"] == 90.0
+    assert all(purchase["title"] != "Pagamento recebido" for purchase in imported["invoice"]["purchases"])
+    repeated = client.post(f"/api/credit-cards/{card['id']}/import-csv", json={"reference_month": "2026-08", "content": content}).json()
+    assert repeated["ignored"] == 1
+    assert repeated["invoice"]["total"] == 90.0
+
+
+def test_category_deletion_removes_unused_and_archives_history():
+    unused = client.post("/api/categories", json={"name": "Temporária", "color": "#A855F7"}).json()
+    removed = client.delete(f"/api/categories/{unused['id']}")
+    assert removed.status_code == 200
+    assert removed.json()["archived"] is False
+    assert all(item["id"] != unused["id"] for item in client.get("/api/categories").json())
+
+    used = client.post("/api/categories", json={"name": "Histórica", "color": "#A855F7"}).json()
+    client.post("/api/transactions", json={"date": date.today().isoformat(), "type": "expense", "amount": 10, "category_id": used["id"]})
+    archived = client.delete(f"/api/categories/{used['id']}")
+    assert archived.status_code == 200
+    assert archived.json()["archived"] is True
+    assert all(item["id"] != used["id"] for item in client.get("/api/categories").json())
+
+
+def test_categorized_card_purchase_counts_in_budget_and_dashboard_without_payment_duplicate():
+    category = client.post("/api/categories", json={"name": "Cartão teste", "color": "#3B82F6"}).json()
+    client.put(f"/api/categories/{category['id']}/budget", json={"budget_limit": 100})
+    card = client.post("/api/credit-cards", json={"name": "Cartão analítico", "closing_day": 20, "due_day": 1}).json()
+    period = date.today().strftime("%Y-%m")
+    purchase_date = (date.today().replace(day=1) - timedelta(days=1)).isoformat()
+    imported = client.post(f"/api/credit-cards/{card['id']}/import-csv", json={"reference_month": period, "content": f"date,title,amount\n{purchase_date},Compra categorizada,\"25,00\"\n"}).json()["invoice"]
+    purchase = imported["purchases"][0]
+    assert client.put(f"/api/credit-cards/purchases/{purchase['id']}/category", json={"category_id": category["id"]}).status_code == 200
+    dashboard = client.get("/api/dashboard", params={"period": period}).json()
+    assert next(item for item in dashboard["by_category"] if item["id"] == category["id"])["amount"] == 25.0
+    budget = next(item for item in client.get("/api/budgets", params={"period": period}).json() if item["id"] == category["id"])
+    assert budget["spent"] == 25.0
+    client.post(f"/api/credit-cards/invoices/{imported['id']}/pay", json={"paid_on": date.today().isoformat(), "amount": 25, "paid_by_owner": True})
+    dashboard_after_payment = client.get("/api/dashboard", params={"period": period}).json()
+    assert next(item for item in dashboard_after_payment["by_category"] if item["id"] == category["id"])["amount"] == 25.0
+
+
+def test_deletes_open_credit_card_invoice_and_its_purchases():
+    card = client.post("/api/credit-cards", json={"name": "Cartão para excluir", "closing_day": 20, "due_day": 1}).json()
+    period = date.today().strftime("%Y-%m")
+    imported = client.post(f"/api/credit-cards/{card['id']}/import-csv", json={"reference_month": period, "content": f"date,title,amount\n{date.today().isoformat()},Compra removível,10.00\n"}).json()["invoice"]
+    assert client.delete(f"/api/credit-cards/invoices/{imported['id']}").status_code == 204
+    assert client.get(f"/api/credit-cards/invoices/{imported['id']}").status_code == 404
+    assert client.get(f"/api/credit-cards/{card['id']}").json()["invoices"] == []
+
+
+def test_card_invoice_payment_records_payer_and_only_owner_changes_balance():
+    card = client.post("/api/credit-cards", json={"name": "Cartão compartilhado", "closing_day": 20, "due_day": 1}).json()
+    invoice = client.post(f"/api/credit-cards/{card['id']}/import-csv", json={"reference_month": date.today().strftime("%Y-%m"), "content": f"date,title,amount\n{date.today().isoformat()},Compra compartilhada,100.00\n"}).json()["invoice"]
+    balance_before = client.get("/api/dashboard").json()["balance"]
+
+    external = client.post(f"/api/credit-cards/invoices/{invoice['id']}/payments", json={"amount": 30, "paid_on": date.today().isoformat(), "paid_by_owner": False, "payer_name": "Ana", "description": "Parte dela"})
+    assert external.status_code == 200
+    assert external.json()["status"] == "open"
+    assert external.json()["paid_total"] == 30.0
+    assert external.json()["remaining_amount"] == 70.0
+    dashboard_after_external_payment = client.get("/api/dashboard").json()
+    assert dashboard_after_external_payment["balance"] == balance_before
+    assert dashboard_after_external_payment["net_expense"] == dashboard_after_external_payment["expense"] - 30
+
+    paid = client.post(f"/api/credit-cards/invoices/{invoice['id']}/pay", json={"amount": 70, "paid_on": date.today().isoformat(), "paid_by_owner": True})
+    assert paid.status_code == 200
+    assert paid.json()["status"] == "paid"
+    assert paid.json()["paid_total"] == 100.0
+    assert paid.json()["remaining_amount"] == 0.0
+    assert any(payment["payer_name"] == "Ana" and payment["paid_by_owner"] is False for payment in paid.json()["payments"])
+    dashboard = client.get("/api/dashboard").json()
+    assert dashboard["balance"] == balance_before - 70
+    assert dashboard["net_expense"] == dashboard["expense"] - 30
