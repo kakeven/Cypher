@@ -6,6 +6,11 @@ __pycache__/
 
 # Frontend build output
 frontend/dist/
+mobile/cypher-android/dist/
+**/node_modules/
+mobile/cypher-android/android/.gradle/
+mobile/cypher-android/android/app/build/
+mobile/cypher-android/.env.local
 
 # Docker
 .docker/

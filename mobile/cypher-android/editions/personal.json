@@ -1,0 +1,5 @@
+{
+  "id": "personal",
+  "name": "Cypher Pessoal",
+  "modules": ["dashboard", "transactions", "budgets", "goals", "receivables", "cards"]
+}

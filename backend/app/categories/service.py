@@ -53,3 +53,8 @@ class CategoryService:
         if not item: item = self.repo.add(Category(name="Cartão de crédito", color="#8B5CF6"))
         item.is_active = True
         return item
+    def subscription_category(self):
+        item = self.repo.by_name("Assinaturas SaaS")
+        if not item: item = self.repo.add(Category(name="Assinaturas SaaS", color="#A855F7"))
+        item.is_active = True
+        return item

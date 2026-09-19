@@ -27,7 +27,10 @@ class RecurringService:
         if not item: raise DomainError(404, "Recorrência não encontrada.")
         self.categories.require(data.category_id)
         for key, value in data.model_dump().items(): setattr(item, key, value)
-        self.db.commit(); self.db.refresh(item); return self.output(item)
+        for occurrence in self.repo.pending_for(item.id): self.db.delete(occurrence)
+        self.db.flush()
+        self.generate(item.id, 12)
+        self.db.refresh(item); return self.output(item)
     def set_active(self, item_id, active):
         item = self.repo.get(item_id)
         if not item: raise DomainError(404, "Recorrência não encontrada.")

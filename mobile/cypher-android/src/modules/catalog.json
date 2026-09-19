@@ -1,0 +1,76 @@
+{
+  "modules": [
+    {
+      "id": "dashboard",
+      "label": "Visão geral",
+      "description": "Consolida saldo, orçamento, metas, recebimentos e cartões.",
+      "dependencies": ["transactions", "categories", "budgets", "goals", "receivables", "cards"],
+      "routes": [{ "path": "/dashboard", "title": "Visão geral", "view": "DashboardView" }],
+      "navigation": { "label": "Visão geral", "order": 1 }
+    },
+    {
+      "id": "transactions",
+      "label": "Transações",
+      "description": "Registra receitas e despesas e alimenta o saldo do produto.",
+      "dependencies": ["categories"],
+      "routes": [{ "path": "/transacoes", "title": "Transações", "view": "TransactionsView" }],
+      "navigation": { "label": "Transações", "order": 2 }
+    },
+    {
+      "id": "categories",
+      "label": "Categorias",
+      "description": "Fornece classificação financeira para transações, orçamentos e cartões.",
+      "dependencies": [],
+      "routes": [],
+      "navigation": null
+    },
+    {
+      "id": "budgets",
+      "label": "Orçamentos",
+      "description": "Define limites mensais por categoria e acompanha o gasto realizado.",
+      "dependencies": ["categories", "transactions"],
+      "routes": [{ "path": "/orcamentos", "title": "Orçamentos", "view": "BudgetsView" }],
+      "navigation": { "label": "Orçamentos", "order": 3 }
+    },
+    {
+      "id": "goals",
+      "label": "Metas",
+      "description": "Organiza metas financeiras e depósitos que reduzem o saldo disponível.",
+      "dependencies": ["transactions"],
+      "routes": [{ "path": "/metas", "title": "Metas", "view": "GoalsView" }],
+      "navigation": { "label": "Metas", "order": 4 }
+    },
+    {
+      "id": "receivables",
+      "label": "Recebimentos",
+      "description": "Controla serviços a receber e cria receitas ao confirmar baixas.",
+      "dependencies": ["categories", "transactions"],
+      "routes": [{ "path": "/recebimentos", "title": "Recebimentos", "view": "ReceivablesView" }],
+      "navigation": { "label": "Recebimentos", "order": 5 }
+    },
+    {
+      "id": "recurring",
+      "label": "Agenda e recorrências",
+      "description": "Agenda receitas e despesas recorrentes e confirma ocorrências previstas.",
+      "dependencies": ["categories", "transactions"],
+      "routes": [{ "path": "/recorrencias", "title": "Agenda e recorrências", "view": "RecurringView" }],
+      "navigation": { "label": "Agenda", "order": 6 }
+    },
+    {
+      "id": "cards",
+      "label": "Cartões",
+      "description": "Importa faturas Nubank, categoriza compras e registra pagamentos.",
+      "dependencies": ["categories", "transactions"],
+      "routes": [{ "path": "/cartoes", "title": "Cartões", "view": "CreditCardsView" }],
+      "navigation": { "label": "Cartões", "order": 7 }
+    },
+    {
+      "id": "subscriptions",
+      "label": "Assinaturas SaaS",
+      "description": "Gerencia contratos SaaS, cobranças e baixas que viram receitas.",
+      "dependencies": ["categories", "transactions"],
+      "routes": [{ "path": "/assinaturas", "title": "Assinaturas SaaS", "view": "SubscriptionsView" }],
+      "navigation": { "label": "Assinaturas SaaS", "order": 8 }
+    }
+  ]
+}

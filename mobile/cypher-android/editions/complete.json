@@ -1,0 +1,5 @@
+{
+  "id": "complete",
+  "name": "Cypher Completo",
+  "modules": ["dashboard", "transactions", "budgets", "goals", "receivables", "recurring", "cards", "subscriptions"]
+}

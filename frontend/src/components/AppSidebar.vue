@@ -7,6 +7,7 @@ const links = [
   { to: '/recebimentos', label: 'Recebimentos' },
   { to: '/recorrencias', label: 'Agenda' },
   { to: '/cartoes', label: 'Cartões' },
+  { to: '/assinaturas', label: 'Assinaturas SaaS' },
 ]
 </script>
 

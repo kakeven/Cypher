@@ -7,6 +7,7 @@ const GoalsView = () => import('@/views/GoalsView.vue')
 const ReceivablesView = () => import('@/views/ReceivablesView.vue')
 const RecurringView = () => import('@/views/RecurringView.vue')
 const CreditCardsView = () => import('@/views/CreditCardsView.vue')
+const SubscriptionsView = () => import('@/views/SubscriptionsView.vue')
 
 const routes = [
   { path: '/', redirect: '/dashboard' },
@@ -17,6 +18,7 @@ const routes = [
   { path: '/recebimentos', component: ReceivablesView, meta: { title: 'Recebimentos' } },
   { path: '/recorrencias', component: RecurringView, meta: { title: 'Agenda e recorrências' } },
   { path: '/cartoes', component: CreditCardsView, meta: { title: 'Cartões' } },
+  { path: '/assinaturas', component: SubscriptionsView, meta: { title: 'Assinaturas SaaS' } },
   { path: '/:pathMatch(.*)*', redirect: '/dashboard' },
 ]
 

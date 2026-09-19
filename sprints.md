@@ -259,3 +259,9 @@ Sprint 8  ░░░░░ Empacotamento Electron  → RNF-01, RNF-05, RNF-06, RN
 ```
 
 **Total:** 8 sprints para chegar ao MVP desktop distribuível. Cada sprint = 1 PR com backend + frontend + testes.
+
+---
+
+## Módulo complementar — Assinaturas SaaS ✅
+
+Implementado fora das sprints originais para o contexto Tervo: clientes, produtos, planos, contratos, cobrança idempotente, pagamentos parciais, estorno, indicadores MRR e interface em `/assinaturas`. Cada recebimento confirmado cria uma receita financeira vinculada à categoria `Assinaturas SaaS`.

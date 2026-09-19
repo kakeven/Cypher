@@ -12,7 +12,8 @@ O produto já cobre transações, categorias e orçamento mensal, painel consoli
 
 | Camada | Implementação atual |
 |---|---|
-| Frontend | Vue 3.5, Vite 8, Vue Router 5 e Pinia 3 |
+| Desktop | Vue 3.5, Vite 8, Vue Router 5 e Pinia 3 |
+| Android | Projeto independente em `mobile/cypher-android`: Ionic Vue 9 e Capacitor 8 |
 | Backend | Python, FastAPI, Uvicorn, SQLAlchemy 2 e Pydantic v2 |
 | Banco | SQLite; URL configurada por `CYPHER_DATABASE_URL` |
 | Testes | pytest + FastAPI TestClient/httpx (backend); 27 testes passam no container em 13/09/2026 |
@@ -60,6 +61,8 @@ Cypher/
 │   │   └── views/                 # dashboard, transações, orçamentos, metas e recebimentos
 │   ├── package.json
 │   └── Dockerfile
+├── mobile/
+│   └── cypher-android/            # app Ionic/Capacitor, catálogo de módulos e projeto Gradle
 ├── docker-compose.yml
 ├── cypher-requisitos-v11-realocado.docx  # fonte de requisitos; não editar
 ├── sprints.md                             # planejamento, não snapshot de entrega
@@ -80,6 +83,7 @@ Cypher/
   - `Transaction(id, date, type, amount, category_id, description, created_at)`;
   - `Goal(id, name, target_amount, deadline, description, created_at)` e `GoalDeposit`;
 - `Receivable(id, name, client, total_amount, service_type, category_id, created_at)` e `ReceivablePayment`.
+- Módulo SaaS: `SaasClient`, `SaasProduct`, `SaasPlan`, `SaasSubscription`, `SaasInvoice` e `SaasPayment`, com cobranças idempotentes por contrato/período.
 - `CreditCard(id, name, brand, credit_limit, closing_day, due_day)`, `CreditCardInvoice`, `CreditCardPurchase` e `CreditCardInvoicePayment`.
 - Compatibilidade pontual no startup: adiciona `service_type` à tabela antiga `receivables` quando a coluna não existe.
 - Valores são armazenados como `Decimal`/`Numeric(12,2)` e serializados como número JSON.
@@ -95,7 +99,8 @@ Regras de negócio efetivamente aplicadas:
 - cada baixa de recebível cria uma transação de receita vinculada, na categoria interna `Outros`; a baixa não pode ultrapassar o valor pendente;
 - tipos de serviço de recebível são limitados a Site institucional, Sistema, E-commerce e Landing page.
 - importação Nubank aceita CSV com `date`, `title` e `amount`, ignora lançamentos de `Pagamento recebido`, normaliza estornos, reconhece parcelas e bloqueia compras já importadas pelo identificador derivado do lançamento;
-- pagamentos de fatura podem ser integrais ou parciais e identificam quem pagou; somente a parte paga pelo titular cria despesa no saldo. Pagamentos de terceiros reduzem exclusivamente o saldo pendente da fatura;
+- pagamentos de fatura podem ser integrais ou parciais e identificam quem pagou; somente a parte paga pelo titular cria despesa no saldo. Pagamentos de terceiros reduzem exclusivamente o saldo pendente da fatura; no card central e no fluxo financeiro, somente lançamentos e compras categorizados fora de `Outras pessoas` são considerados como despesas próprias;
+- assinaturas SaaS são contratos, não receitas: cobranças previstas não alteram o saldo e cada baixa confirmada cria uma única transação de receita na categoria automática `Assinaturas SaaS`; baixas parciais e estornos são suportados.
 - compras de cartão permanecem nos relatórios da fatura e os pagamentos feitos pelo titular são excluídos desses relatórios para evitar dupla contagem.
 
 ### Endpoints expostos
@@ -143,6 +148,13 @@ Todos usam o prefixo `/api`.
 | POST | `/credit-cards/invoices/{id}/payments` | Registra pagamento parcial, com pagador e efeito correto no saldo |
 | PUT | `/credit-cards/purchases/{id}/category` | Define a categoria de uma compra |
 | POST | `/credit-cards/invoices/{id}/pay` | Quita o restante da fatura, identificando quem realizou o pagamento |
+| GET/POST/PUT | `/saas-clients`, `/saas-products`, `/saas-plans` | Gerencia clientes, produtos e planos SaaS |
+| GET/POST/PUT | `/saas-subscriptions` | Lista, cria e atualiza contratos SaaS; o detalhe é em `/saas-subscriptions/{id}` |
+| POST | `/saas-subscriptions/{id}/pause`, `/resume`, `/cancel` | Altera o estado do contrato sem apagar histórico |
+| POST | `/saas-subscriptions/generate-invoices` | Gera cobranças futuras sem duplicar períodos |
+| GET | `/saas-invoices` | Lista cobranças, com filtros de período, status, cliente e vencimento |
+| POST/DELETE | `/saas-invoices/{id}/payments`, `/saas-payments/{id}` | Registra ou estorna uma baixa e sua receita vinculada |
+| GET | `/saas-dashboard` | Retorna MRR, previsão, recebido, atraso e próximos vencimentos |
 
 Erros de domínio retornam `detail` em português com os códigos adequados, como `404`, `409` e `422`. Validações de contrato do Pydantic também retornam `422`.
 
@@ -150,19 +162,23 @@ Erros de domínio retornam `detail` em português com os códigos adequados, com
 
 - Shell de desktop com sidebar fixa, título dinâmico por rota e toaster global.
 - Rotas ativas: `/dashboard`, `/transacoes`, `/orcamentos`, `/metas` e `/recebimentos`; `/` e rotas desconhecidas redirecionam para `/dashboard`.
-- Dashboard consome os agregados da API e exibe o fluxo mensal de receitas e despesas em linhas separadas, além de uma rosquinha interativa de gastos por categoria, com legenda percentual, valores e atalho para o histórico filtrado. O card de despesas abate a parte da fatura que foi paga por terceiros.
+- Dashboard consome os agregados da API e exibe o fluxo mensal de receitas e despesas em linhas separadas, interrompendo as linhas no mês selecionado, além de uma rosquinha interativa de gastos por categoria, com legenda percentual, valores e atalho para o histórico filtrado. O resumo mensal separa despesas próprias do total pendente nos cartões, desconsiderando compras categorizadas como `Outras pessoas` e abatendo apenas pagamentos feitos pelo próprio titular.
 - Transações têm formulário, filtros, edição e exclusão pelo menu de contexto com confirmação, além de store Pinia dedicado (`transactions`); receitas não pedem categoria na interface.
 - Orçamentos permitem definir limites, editar nome/cor, resetar o orçamento ou excluir uma categoria pelo menu de contexto; categorias com histórico são arquivadas e preservam lançamentos antigos.
 - Metas carregam os registros existentes ao abrir a tela e permitem criar, editar e excluir pelo menu de contexto com confirmação, selecionar o detalhe e incluir depósitos.
 - Recebimentos permitem criar, editar e excluir projeto/serviço pelo menu de contexto com confirmação, acompanhar o saldo pendente e registrar baixas parciais.
-- Agenda e recorrências permitem cadastrar receitas/despesas diárias, semanais, mensais ou anuais, gerar ocorrências previstas, pausar/reativar e editar/excluir pelo menu de contexto com confirmação. A confirmação cria a transação real; o previsto não altera o saldo.
+- Agenda e recorrências permitem cadastrar receitas/despesas diárias, semanais, mensais ou anuais, gerar ocorrências previstas, pausar/reativar e editar/excluir pelo menu de contexto com confirmação. Ao editar uma recorrência, as ocorrências pendentes são recriadas com as novas regras e as já confirmadas são preservadas. A confirmação cria a transação real; o previsto não altera o saldo.
 - Cartões permitem cadastrar dados do cartão, importar o CSV Nubank localmente, conferir compras/estornos/parcelas, categorizar compras, excluir faturas abertas e registrar pagamento total ou parcial. Em ambos os modos, o usuário define se pagou ou se foi outra pessoa; apenas o próprio pagamento reduz o saldo. Compras categorizadas entram no orçamento e no ranking de gastos no mês de referência da fatura; o pagamento não é contado novamente nesses relatórios.
+- Assinaturas SaaS oferece uma área única com abas de contratos, cobranças, clientes e catálogo. Permite cadastrar e editar contratos mensais/trimestrais/semestrais/anuais pelo menu de contexto, gerar cobranças, receber parcial ou integralmente, pausar, retomar, cancelar e estornar baixas com confirmação.
 - Cliente HTTP centralizado em `src/services/api.js`, incluindo normalização de mensagens de erro em português.
-- Tema escuro com tokens CSS em `src/assets/variaveis.css`; a aplicação impõe largura mínima de 1024px, portanto não é responsiva para mobile.
+- O frontend desktop mantém sua sidebar, rotas e dependências próprias em `frontend/`.
+- O Android é independente em `mobile/cypher-android`: Ionic Vue, Capacitor, SQLite local, biometria/PIN e uma camada de dados configurável. Leituras realizadas online ficam em cache SQLite para consulta offline; mutações offline aguardam a implementação do protocolo de sincronização LAN.
+- O guia de desenvolvimento e instalação no aparelho Android, incluindo live reload e o tratamento de mudanças nativas, está em `mobile/cypher-android/README.md`.
+- Edições modulares Android são definidas por JSON: `mobile/cypher-android/src/modules/catalog.json` cataloga rotas, telas, navegação e dependências; `mobile/cypher-android/editions/*.json` seleciona módulos de entrada. O Vite inclui no bundle somente as views da edição ativa.
 
 ### Infraestrutura e qualidade
 
-- `docker-compose.yml` expõe backend em `8000` e frontend em `5173`.
+- `docker-compose.yml` expõe backend em `8000`, desktop em `5173` e o projeto Android Ionic em `5174`.
 - O Compose monta os fontes, persiste SQLite no volume `sqlite-data` e usa `frontend-node-modules` para dependências do frontend no container.
 - Há testes de API para categorias, transações, filtros, dashboard, orçamento, metas, recebíveis e validações relevantes em `backend/tests/test_api.py`.
 - Não há testes automatizados do frontend nem pipeline de CI configurado no repositório.
@@ -180,7 +196,7 @@ Prioridades e escopo devem ser confirmados contra o documento de requisitos e `s
 | Simulações | Sem cálculos de juros, aposentadoria, metas ou Monte Carlo |
 | Cartão de crédito | Não há edição/exclusão de cartão, fatura automática por fechamento, limites disponíveis, parcelamento consolidado ou integração com outros bancos; a importação CSV Nubank está implementada |
 | Notificações | Sem scheduler, preferências ou notificações locais/web |
-| Cartão, sync bancário e mobile | Fora da implementação atual |
+| Sincronização mobile | O cache e a fila local existem, mas o protocolo de sincronização LAN com o FastAPI ainda não foi implementado |
 | Desktop distribuível | Sem diretório Electron, `electron-builder`, runtime Python empacotado ou instaladores |
 | Visualização | Chart.js e Plotly não são dependências instaladas; dashboard não traz gráficos dessas bibliotecas |
 | Responsividade e acessibilidade | Não há versão mobile e não há uma auditoria de acessibilidade concluída |
@@ -197,6 +213,8 @@ Prioridades e escopo devem ser confirmados contra o documento de requisitos e `s
 7. O fluxo comercial de recebíveis não pede categoria financeira ao usuário; o backend vincula a receita criada à categoria `Outros`.
 8. Não adicionar dependências sem justificativa; o projeto usa pnpm no frontend e os requisitos Python declarados em `backend/requirements.txt`. A importação CSV do Nubank usa apenas a biblioteca padrão do Python.
 9. O host atual não tem `python` disponível no `PATH` e o `pnpm` local encontra `EPERM` em `frontend/node_modules`; use Docker Compose como ambiente de validação até que essas permissões/runtimes locais sejam corrigidos. O script `pnpm lint` também aplica `--fix`, portanto não deve ser usado como verificação puramente read-only.
+10. O mobile Android é um projeto Ionic Vue + Capacitor separado em `mobile/cypher-android`; o primeiro artefato previsto é um APK de teste, com biometria quando disponível ou PIN de seis dígitos.
+11. As edições Android `complete`, `personal`, `essentials` e `saas` usam arquivos JSON e são escolhidas no build por `VITE_CYPHER_EDITION`; dependências declaradas no catálogo sempre acompanham o módulo selecionado.
 
 ## Observações para a próxima mudança
 

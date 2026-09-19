@@ -18,6 +18,8 @@ from .recurring.model import RecurringOccurrence, RecurringTransaction
 from .recurring.router import router as recurring_router
 from .transactions.model import Transaction
 from .transactions.router import router as transactions_router
+from .subscriptions.model import SaasClient, SaasInvoice, SaasPayment, SaasPlan, SaasProduct, SaasSubscription
+from .subscriptions.router import router as subscriptions_router
 
 
 def startup() -> None:
@@ -33,7 +35,10 @@ def startup() -> None:
             with engine.begin() as connection:
                 connection.execute(text("ALTER TABLE categories ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT 1"))
     with SessionLocal() as db:
-        CategoryService(db).ensure_defaults()
+        categories = CategoryService(db)
+        categories.ensure_defaults()
+        categories.subscription_category()
+        db.commit()
 
 
 def create_app() -> FastAPI:
@@ -51,5 +56,6 @@ def create_app() -> FastAPI:
     app.include_router(goals_router, prefix="/api")
     app.include_router(receivables_router, prefix="/api")
     app.include_router(recurring_router, prefix="/api")
+    app.include_router(subscriptions_router, prefix="/api")
     app.on_event("startup")(startup)
     return app

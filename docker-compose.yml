@@ -22,6 +22,19 @@ services:
     depends_on:
       - backend
 
+  cypher-android:
+    build: ./mobile/cypher-android
+    ports:
+      - "5174:5173"
+    volumes:
+      - ./mobile/cypher-android:/app
+      - cypher-android-node-modules:/app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:8000/api
+    depends_on:
+      - backend
+
 volumes:
   sqlite-data:
   frontend-node-modules:
+  cypher-android-node-modules:

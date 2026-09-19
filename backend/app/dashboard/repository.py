@@ -18,6 +18,7 @@ class DashboardRepository:
     def goal_deposits(self): return list(self.db.scalars(select(GoalDeposit)))
     def categories(self): return self._categories.list()
     def card_purchases(self): return list(self.db.scalars(select(CreditCardPurchase).options(selectinload(CreditCardPurchase.category), selectinload(CreditCardPurchase.invoice))))
+    def card_invoices(self): return list(self.db.scalars(select(CreditCardInvoice).options(selectinload(CreditCardInvoice.purchases), selectinload(CreditCardInvoice.payments))))
     def card_payments(self): return list(self.db.scalars(select(CreditCardInvoicePayment).options(selectinload(CreditCardInvoicePayment.invoice))))
     def payment_transaction_ids(self):
         legacy_ids = set(self.db.scalars(select(CreditCardInvoice.payment_transaction_id).where(CreditCardInvoice.payment_transaction_id.is_not(None))))

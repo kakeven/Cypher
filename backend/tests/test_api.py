@@ -30,7 +30,8 @@ def test_health():
 def test_categories_are_seeded():
     response = client.get("/api/categories")
     assert response.status_code == 200
-    assert len(response.json()) == 7
+    assert len(response.json()) >= 7
+    assert any(item["name"] == "Assinaturas SaaS" for item in response.json())
 
 
 def test_creates_category_and_rejects_duplicate_name():
@@ -245,6 +246,27 @@ def test_recurring_pause_prevents_generation():
     assert client.post(f"/api/recurring-transactions/{recurring['id']}/resume").json()["is_active"] is True
 
 
+def test_recurring_update_refreshes_pending_occurrences_in_agenda():
+    category = category_id()
+    recurring = client.post("/api/recurring-transactions", json={
+        "name": "Freelance", "type": "income", "amount": 1000, "category_id": category,
+        "frequency": "monthly", "interval": 1, "day_of_month": date.today().day, "start_date": date.today().isoformat(),
+    }).json()
+    generated = client.post(f"/api/recurring-transactions/{recurring['id']}/generate-occurrences").json()
+    assert any(item["due_date"] == date.today().isoformat() for item in generated)
+
+    updated = client.put(f"/api/recurring-transactions/{recurring['id']}", json={
+        "name": "Freelance revisado", "type": "income", "amount": 1250, "category_id": category,
+        "frequency": "monthly", "interval": 1, "day_of_month": date.today().day, "start_date": date.today().isoformat(),
+    })
+
+    assert updated.status_code == 200
+    agenda = client.get("/api/occurrences", params={"period": date.today().strftime("%Y-%m")}).json()
+    current = next(item for item in agenda if item["recurring_id"] == recurring["id"] and item["due_date"] == date.today().isoformat())
+    assert current["recurring_name"] == "Freelance revisado"
+    assert current["amount"] == 1250
+
+
 def test_nubank_csv_import_deduplicates_and_pays_invoice():
     card = client.post("/api/credit-cards", json={"name": "Nubank", "brand": "Mastercard", "credit_limit": 5000, "closing_day": 24, "due_day": 1})
     assert card.status_code == 201
@@ -323,6 +345,7 @@ def test_card_invoice_payment_records_payer_and_only_owner_changes_balance():
     card = client.post("/api/credit-cards", json={"name": "Cartão compartilhado", "closing_day": 20, "due_day": 1}).json()
     invoice = client.post(f"/api/credit-cards/{card['id']}/import-csv", json={"reference_month": date.today().strftime("%Y-%m"), "content": f"date,title,amount\n{date.today().isoformat()},Compra compartilhada,100.00\n"}).json()["invoice"]
     balance_before = client.get("/api/dashboard").json()["balance"]
+    expense_card_before = client.get("/api/dashboard").json()["net_expense"]
 
     external = client.post(f"/api/credit-cards/invoices/{invoice['id']}/payments", json={"amount": 30, "paid_on": date.today().isoformat(), "paid_by_owner": False, "payer_name": "Ana", "description": "Parte dela"})
     assert external.status_code == 200
@@ -331,7 +354,7 @@ def test_card_invoice_payment_records_payer_and_only_owner_changes_balance():
     assert external.json()["remaining_amount"] == 70.0
     dashboard_after_external_payment = client.get("/api/dashboard").json()
     assert dashboard_after_external_payment["balance"] == balance_before
-    assert dashboard_after_external_payment["net_expense"] == dashboard_after_external_payment["expense"] - 30
+    assert dashboard_after_external_payment["net_expense"] == expense_card_before
 
     paid = client.post(f"/api/credit-cards/invoices/{invoice['id']}/pay", json={"amount": 70, "paid_on": date.today().isoformat(), "paid_by_owner": True})
     assert paid.status_code == 200
@@ -341,4 +364,76 @@ def test_card_invoice_payment_records_payer_and_only_owner_changes_balance():
     assert any(payment["payer_name"] == "Ana" and payment["paid_by_owner"] is False for payment in paid.json()["payments"])
     dashboard = client.get("/api/dashboard").json()
     assert dashboard["balance"] == balance_before - 70
-    assert dashboard["net_expense"] == dashboard["expense"] - 30
+    assert dashboard["net_expense"] == expense_card_before
+
+
+def test_dashboard_includes_total_pending_credit_card_invoices():
+    pending_before = client.get("/api/dashboard").json()["card_pending"]
+    other_people = client.post("/api/categories", json={"name": "Outras pessoas", "color": "#A855F7"}).json()
+    card = client.post("/api/credit-cards", json={"name": "Cartão pendente", "closing_day": 20, "due_day": 1}).json()
+    invoice = client.post(f"/api/credit-cards/{card['id']}/import-csv", json={"reference_month": date.today().strftime("%Y-%m"), "content": f"date,title,amount\n{date.today().isoformat()},Compra pendente,100.00\n{date.today().isoformat()},Compra da Ana,40.00\n"}).json()["invoice"]
+    purchase_from_other_person = next(item for item in invoice["purchases"] if item["title"] == "Compra da Ana")
+    assert client.put(f"/api/credit-cards/purchases/{purchase_from_other_person['id']}/category", json={"category_id": other_people["id"]}).status_code == 200
+    client.post(f"/api/credit-cards/invoices/{invoice['id']}/payments", json={"amount": 35, "paid_on": date.today().isoformat(), "paid_by_owner": False, "payer_name": "Ana"})
+
+    dashboard = client.get("/api/dashboard").json()
+
+    assert dashboard["card_pending"] == pending_before + 100.0
+
+
+def test_saas_subscription_generates_invoices_and_records_partial_payment_once():
+    client_item = client.post("/api/saas-clients", json={"name": "Loja Tervo"})
+    assert client_item.status_code == 201
+    product = client.post("/api/saas-products", json={"name": "Gestão de Loja"})
+    assert product.status_code == 201
+    subscription = client.post("/api/saas-subscriptions", json={
+        "client_id": client_item.json()["id"], "product_id": product.json()["id"], "name": "Plano mensal",
+        "amount": 99, "billing_cycle": "monthly", "due_day": date.today().day,
+        "start_date": date.today().isoformat(),
+    })
+    assert subscription.status_code == 201
+    generated = client.post("/api/saas-subscriptions/generate-invoices", json={"end_date": date.today().isoformat()})
+    assert generated.status_code == 200
+    invoices = client.get("/api/saas-invoices", params={"period": date.today().strftime("%Y-%m")}).json()
+    invoice = next(item for item in invoices if item["subscription_id"] == subscription.json()["id"])
+    again = client.post("/api/saas-subscriptions/generate-invoices", json={"end_date": date.today().isoformat()})
+    assert again.json() == []
+
+    payment = client.post(f"/api/saas-invoices/{invoice['id']}/payments", json={"amount": 50, "paid_at": date.today().isoformat(), "payment_method": "pix"})
+    assert payment.status_code == 201
+    partial = next(item for item in client.get("/api/saas-invoices", params={"period": date.today().strftime("%Y-%m")}).json() if item["id"] == invoice["id"])
+    assert partial["status"] == "partial"
+    assert partial["remaining_amount"] == 49.0
+    transaction = next(item for item in client.get("/api/transactions", params={"type": "income"}).json() if item["id"] == payment.json()["transaction_id"])
+    assert transaction["amount"] == 50.0
+    assert transaction["category_name"] == "Assinaturas SaaS"
+
+
+def test_saas_cancellation_preserves_history_and_stops_future_invoices():
+    client_item = client.post("/api/saas-clients", json={"name": "Cliente cancelado"}).json()
+    product = client.post("/api/saas-products", json={"name": "Produto cancelado"}).json()
+    subscription = client.post("/api/saas-subscriptions", json={
+        "client_id": client_item["id"], "product_id": product["id"], "name": "Contrato cancelável",
+        "amount": 100, "billing_cycle": "monthly", "due_day": 1, "start_date": date.today().replace(day=1).isoformat(),
+    }).json()
+    client.post("/api/saas-subscriptions/generate-invoices", json={"end_date": (date.today() + timedelta(days=90)).isoformat()})
+    before = [item for item in client.get("/api/saas-invoices").json() if item["subscription_id"] == subscription["id"]]
+    canceled = client.post(f"/api/saas-subscriptions/{subscription['id']}/cancel", json={"canceled_at": date.today().isoformat()})
+    assert canceled.status_code == 200
+    client.post("/api/saas-subscriptions/generate-invoices", json={"end_date": (date.today() + timedelta(days=365)).isoformat()})
+    after = [item for item in client.get("/api/saas-invoices").json() if item["subscription_id"] == subscription["id"]]
+    assert len(after) == len(before)
+
+
+def test_dashboard_expense_card_excludes_other_people_category():
+    own_category = client.post("/api/categories", json={"name": "Despesa própria", "color": "#10B981"}).json()
+    other_people = next(item for item in client.get("/api/categories").json() if item["name"] == "Outras pessoas")
+    period = date.today().strftime("%Y-%m")
+    before_dashboard = client.get("/api/dashboard", params={"period": period}).json()
+    before = before_dashboard["net_expense"]
+    before_flow = next(item for item in before_dashboard["monthly_evolution"] if item["month"] == period)["expense"]
+    client.post("/api/transactions", json={"date": date.today().isoformat(), "type": "expense", "amount": 80, "category_id": own_category["id"]})
+    client.post("/api/transactions", json={"date": date.today().isoformat(), "type": "expense", "amount": 120, "category_id": other_people["id"]})
+    dashboard = client.get("/api/dashboard", params={"period": period}).json()
+    assert dashboard["net_expense"] == before + 80
+    assert next(item for item in dashboard["monthly_evolution"] if item["month"] == period)["expense"] == before_flow + 80
