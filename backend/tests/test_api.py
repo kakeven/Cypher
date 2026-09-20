@@ -27,6 +27,18 @@ def test_health():
     assert client.get("/api/health").json() == {"status": "ok"}
 
 
+def test_allows_cors_from_android_preview():
+    response = client.options(
+        "/api/categories",
+        headers={
+            "Origin": "http://localhost:5174",
+            "Access-Control-Request-Method": "GET",
+        },
+    )
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:5174"
+
+
 def test_categories_are_seeded():
     response = client.get("/api/categories")
     assert response.status_code == 200

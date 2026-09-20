@@ -15,6 +15,7 @@ const categories = ref([])
 const categoriesError = ref('')
 const formError = ref('')
 const editingId = ref(null)
+const showForm = ref(window.innerWidth > 640)
 const today = todayISO()
 const currentMonthValue = currentMonth()
 
@@ -57,12 +58,14 @@ async function save() {
       toast.success('Transação adicionada.')
     }
     resetForm()
+    if (window.innerWidth <= 640) showForm.value = false
   } catch (e) {
     formError.value = e.message
   }
 }
 
 function startEdit(item) {
+  showForm.value = true
   editingId.value = item.id
   form.date = item.date
   form.type = item.type
@@ -76,6 +79,11 @@ function resetForm() {
   editingId.value = null
   Object.assign(form, emptyForm())
   formError.value = ''
+}
+
+function closeForm() {
+  resetForm()
+  if (window.innerWidth <= 640) showForm.value = false
 }
 
 const contextMenu = ref(null)
@@ -130,18 +138,20 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div>
+  <div class="transactions-page">
     <header class="page-header">
       <div>
         <h1>Transações</h1>
         <p>Registre e acompanhe cada entrada e saída.</p>
       </div>
+      <button type="button" class="button mobile-new" @click="showForm = true">Nova</button>
     </header>
 
     <p v-if="categoriesError" class="message" role="alert">{{ categoriesError }}</p>
 
-    <section class="card form">
-      <h2>{{ editingId ? 'Editar transação' : 'Nova transação' }}</h2>
+    <div v-if="showForm || editingId" class="form-modal" @click.self="closeForm">
+    <section class="card form" @click.stop>
+      <div class="form-heading"><h2>{{ editingId ? 'Editar transação' : 'Nova transação' }}</h2><button type="button" class="form-close" aria-label="Fechar formulário" @click="closeForm">×</button></div>
       <form class="form-grid" @submit.prevent="save">
         <label>
           Tipo
@@ -174,10 +184,11 @@ onBeforeUnmount(() => {
         <p v-if="formError" class="message message--inline" role="alert">{{ formError }}</p>
         <div class="actions">
           <button class="button">{{ editingId ? 'Salvar alterações' : 'Adicionar transação' }}</button>
-          <button v-if="editingId" type="button" class="button button--ghost" @click="resetForm">Cancelar</button>
+          <button v-if="editingId" type="button" class="button button--ghost" @click="closeForm">Cancelar</button>
         </div>
       </form>
     </section>
+    </div>
 
     <section class="card list">
       <div class="list-header">
@@ -188,18 +199,18 @@ onBeforeUnmount(() => {
         <div class="filters">
           <label class="sr-only" for="filter-type">Filtrar por tipo</label>
           <select id="filter-type" v-model="filters.type" class="input" @change="applyFilters">
-            <option value="">Todos os tipos</option>
+            <option value="">Tipos</option>
             <option value="income">Receitas</option>
             <option value="expense">Despesas</option>
           </select>
           <label class="sr-only" for="filter-category">Filtrar por categoria</label>
           <select id="filter-category" v-model="filters.category_id" class="input" @change="applyFilters">
-            <option value="">Todas categorias</option>
+            <option value="">Categorias</option>
             <option v-for="category in categories" :key="category.id" :value="category.id">
               {{ category.name }}
             </option>
           </select>
-          <DateRangePicker v-model:start="filters.date_from" v-model:end="filters.date_to" :max="today" @change="applyFilters" />
+          <DateRangePicker v-model:start="filters.date_from" v-model:end="filters.date_to" :max="today" compact @change="applyFilters" />
           <button v-if="filterActive" type="button" class="button button--ghost" @click="clearFilters">Limpar</button>
         </div>
       </div>
@@ -243,7 +254,10 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .form, .list { margin-bottom: 18px; }
+.form-modal { display: contents; }
 .form h2 { font-size: 16px; margin: 0 0 18px; letter-spacing: -0.02em; }
+.form-heading { display: flex; justify-content: space-between; align-items: center; }
+.form-close, .mobile-new { display: none; }
 .list { padding: 0; overflow: hidden; border-color: var(--color-border-strong); box-shadow: none; }
 .actions { display: flex; gap: 10px; }
 .message--inline { grid-column: 1 / -1; margin: 4px 0 0; }
@@ -275,4 +289,31 @@ th.amount, td.amount { text-align: right; }
 .positive { color: var(--color-success); }
 .negative { color: var(--color-danger); }
 @media (max-width: 1100px) { .list-header { align-items: start; } th, td { padding-left: 14px; padding-right: 14px; } .quick-ranges { padding-left: 14px; } }
+@media (max-width: 640px) {
+  .transactions-page { display: flex; height: calc(100dvh - 116px); min-height: 0; flex-direction: column; overflow: hidden; overscroll-behavior: none; }
+  .transactions-page > .page-header { flex: 0 0 auto; }
+  .mobile-new { display: inline-flex; min-height: 36px; padding: 7px 14px; align-items: center; }
+  .form-modal { position: fixed; z-index: 30; inset: 0; display: flex; align-items: center; padding: 14px; background: rgba(2, 7, 14, .7); backdrop-filter: blur(4px); }
+  .form { width: 100%; max-height: min(680px, calc(100dvh - 28px)); margin: 0; padding: 18px 14px max(18px, env(safe-area-inset-bottom)); overflow-y: auto; border-color: var(--color-border-strong); border-radius: 16px; box-shadow: 0 -16px 42px rgba(0, 0, 0, .36); }
+  .form-heading h2 { margin-bottom: 14px; }
+  .form-close { display: block; width: 32px; height: 32px; border: 0; border-radius: 50%; color: var(--color-text-secondary); background: var(--color-surface-raised); font-size: 23px; line-height: 1; }
+  .actions .button { flex: 1; }
+  .list { display: flex; min-height: 0; flex: 1 1 auto; flex-direction: column; margin-bottom: 0; border-radius: 12px; overflow: hidden; }
+  .list-header { padding: 14px 14px 8px; }
+  .history-heading p { display: none; }
+  .filters { width: 100%; flex-wrap: wrap; overflow: visible; padding-bottom: 4px; }
+  .filters .input { flex: 1 1 0; min-width: 0; }
+  .quick-ranges { padding: 0 14px 10px; }
+  table { display: block; min-height: 0; flex: 1 1 auto; overflow: hidden; }
+  tbody { display: block; height: 100%; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+  thead { display: none; }
+  tbody { padding: 0 14px 4px; }
+  tbody tr { display: grid; grid-template-columns: 1fr auto; gap: 3px 12px; padding: 12px 0; border-bottom: 1px solid var(--color-border); }
+  tbody tr:last-child { border-bottom: 0; }
+  td { display: none; padding: 0; border: 0; }
+  td.description-cell, td.amount, td.category-cell { display: block; }
+  td.description-cell { grid-column: 1; grid-row: 1; font-size: 13px; }
+  td.category-cell { grid-column: 1; grid-row: 2; font-size: 11px; }
+  td.amount { grid-column: 2; grid-row: 1 / span 2; align-self: center; font-size: 13px; }
+}
 </style>

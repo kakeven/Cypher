@@ -1,6 +1,5 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { RouterLink } from 'vue-router'
 import { api } from '@/services/api'
 import { brl, formatDateBR, currentMonth, monthRange } from '@/utils/format'
 import DateInput from '@/components/DateInput.vue'
@@ -36,13 +35,16 @@ function compactCurrency(value) {
 const categoryRanking = computed(() => [...(data.value?.by_category || [])].sort((a, b) => b.amount - a.amount))
 const categoryBreakdown = computed(() => {
   const total = Number(data.value?.expense || 0)
-  const items = categoryRanking.value.map((item) => ({ ...item, amount: Number(item.amount) }))
+  const items = categoryRanking.value
+    .map((item) => ({ ...item, amount: Number(item.amount) }))
+    .filter((item) => item.amount > 0)
   const categorized = items.reduce((sum, item) => sum + item.amount, 0)
   const uncategorized = Math.max(0, total - categorized)
   if (uncategorized > 0.005) items.push({ id: null, name: 'Sem categoria', color: '#596273', amount: uncategorized })
   let start = 0
-  return items.map((item) => {
-    const percent = total ? (item.amount / total) * 100 : 0
+  return items.map((item, index) => {
+    const rawPercent = total ? (item.amount / total) * 100 : 0
+    const percent = index === items.length - 1 ? Math.max(0, 100 - start) : Math.min(rawPercent, Math.max(0, 100 - start))
     const slice = { ...item, percent, start }
     start += percent
     return slice
@@ -50,11 +52,9 @@ const categoryBreakdown = computed(() => {
 })
 const hoveredCategory = ref(null)
 const donutCenter = computed(() => hoveredCategory.value || { name: 'Despesas', amount: Number(data.value?.expense || 0), percent: 100 })
+function selectCategory(item) { hoveredCategory.value = item }
+function clearCategory() { hoveredCategory.value = null }
 function formatPercent(value) { return `${Number(value).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%` }
-function categoryTransactionQuery(categoryId) {
-  const [date_from, date_to] = monthRange(period.value)
-  return { category_id: categoryId, date_from, date_to }
-}
 const alerts = computed(() => {
   return [
     ...budgets.value.filter((item) => item.percent >= 80).map((item) => ({ label: item.name, detail: `${item.percent}% do orçamento usado`, type: item.percent >= 100 ? 'negative' : 'warning' })),
@@ -94,7 +94,6 @@ onMounted(load)
     <header class="page-header dashboard-header">
       <div>
         <h1>Visão geral</h1>
-        <p>Seu dinheiro em movimento, sem ruído.</p>
       </div>
       <label class="sr-only" for="dashboard-period">Período</label>
       <DateInput id="dashboard-period" v-model="period" type="month" :max="currentMonth()" class="month" @change="load"/>
@@ -172,18 +171,15 @@ onMounted(load)
           <div v-else class="category-visualization">
             <ol class="category-legend">
               <li v-for="item in categoryBreakdown" :key="item.id || 'uncategorized'">
-                <RouterLink v-if="item.id" :to="{ path: '/transacoes', query: categoryTransactionQuery(item.id) }" :class="{ active: hoveredCategory?.id === item.id }" :aria-label="`Ver transações de ${item.name}`" @mouseenter="hoveredCategory = item" @mouseleave="hoveredCategory = null" @focus="hoveredCategory = item" @blur="hoveredCategory = null">
-                  <i :style="{ background: item.color }" /><b>{{ item.name }}</b><strong>{{ formatPercent(item.percent) }}</strong><small>{{ brl(item.amount) }}</small>
-                </RouterLink>
-                <div v-else :class="{ active: hoveredCategory?.id === null }" @mouseenter="hoveredCategory = item" @mouseleave="hoveredCategory = null">
-                  <i :style="{ background: item.color }" /><b>{{ item.name }}</b><strong>{{ formatPercent(item.percent) }}</strong><small>{{ brl(item.amount) }}</small>
-                </div>
+                <button type="button" :class="{ active: hoveredCategory?.id === item.id }" :aria-label="`Selecionar categoria ${item.name}`" @mouseenter="selectCategory(item)" @mouseleave="clearCategory" @pointerdown="selectCategory(item)" @focus="selectCategory(item)" @blur="clearCategory">
+                  <i :style="{ background: item.color, '--category-color': item.color }" /><b>{{ item.name }}</b><strong>{{ formatPercent(item.percent) }}</strong><small>{{ brl(item.amount) }}</small>
+                </button>
               </li>
             </ol>
             <div class="donut-panel">
-              <svg class="donut-chart" viewBox="0 0 200 200" role="img" aria-label="Distribuição de despesas por categoria" @mouseleave="hoveredCategory = null">
+              <svg class="donut-chart" :class="{ 'has-selection': hoveredCategory }" viewBox="0 0 200 200" role="img" aria-label="Distribuição de despesas por categoria" @mouseleave="clearCategory">
                 <circle class="donut-track" cx="100" cy="100" r="74" />
-                <circle v-for="item in categoryBreakdown" :key="item.id || 'uncategorized'" class="donut-segment" cx="100" cy="100" r="74" fill="none" :stroke="item.color" stroke-width="28" pathLength="100" :stroke-dasharray="`${item.percent} ${100 - item.percent}`" :stroke-dashoffset="-item.start" :aria-label="`${item.name}: ${formatPercent(item.percent)}`" tabindex="0" @mouseenter="hoveredCategory = item" @focus="hoveredCategory = item" @blur="hoveredCategory = null" />
+                <circle v-for="item in categoryBreakdown" :key="item.id || 'uncategorized'" class="donut-segment" :class="{ active: hoveredCategory?.id === item.id }" cx="100" cy="100" r="74" fill="none" :stroke="item.color" stroke-width="28" pathLength="100" :stroke-dasharray="`${item.percent} ${100 - item.percent}`" :stroke-dashoffset="-item.start" :aria-label="`${item.name}: ${formatPercent(item.percent)}`" tabindex="0" @mouseenter="selectCategory(item)" @pointerdown="selectCategory(item)" @focus="selectCategory(item)" @blur="clearCategory" />
               </svg>
               <div class="donut-center" aria-live="polite"><b>{{ formatPercent(donutCenter.percent) }}</b><span>{{ donutCenter.name }}</span><small>{{ brl(donutCenter.amount) }}</small></div>
             </div>
@@ -224,6 +220,7 @@ onMounted(load)
 .flow-legend .expense { color: var(--color-danger); }
 .chart-layout { display: grid; grid-template-columns: 58px 1fr; gap: 9px; height: 160px; margin-top: 14px; }
 .chart-scale { display: flex; flex-direction: column; justify-content: space-between; color: var(--color-text-muted); font-size: 10px; line-height: 1; text-align: right; }
+.chart-scale span { white-space: nowrap; }
 .graph { min-width: 0; min-height: 0; overflow: hidden; border-bottom: 1px solid var(--color-border); }
 .graph svg { display: block; width: 100%; height: 100%; }
 .graph line { stroke: rgba(255, 255, 255, 0.07); stroke-width: .5; vector-effect: non-scaling-stroke; }
@@ -251,18 +248,20 @@ onMounted(load)
 .category-ranking header > span { color: var(--color-text-secondary); font-size: 12px; white-space: nowrap; }
 .category-visualization { display: grid; grid-template-columns: minmax(260px, 1fr) minmax(260px, .8fr); align-items: center; gap: 38px; margin-top: 17px; }
 .category-legend { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; }
-.category-legend a, .category-legend div { display: grid; grid-template-columns: 9px minmax(0, 1fr) auto; column-gap: 9px; align-items: center; padding: 9px 10px; border-radius: 6px; color: inherit; text-decoration: none; }
-.category-legend a:hover, .category-legend a:focus-visible, .category-legend .active { outline: 0; background: var(--color-surface-raised); }
-.category-legend i { width: 8px; height: 8px; grid-row: span 2; border-radius: 50%; }
+.category-legend button { display: grid; width: 100%; grid-template-columns: 9px minmax(0, 1fr) auto; column-gap: 9px; align-items: center; padding: 9px 10px; border: 0; border-radius: 6px; background: transparent; color: inherit; font: inherit; text-align: left; touch-action: manipulation; }
+.category-legend button:hover, .category-legend button:focus-visible, .category-legend .active { outline: 0; background: var(--color-surface-raised); }
+.category-legend i { width: 8px; height: 8px; grid-row: span 2; border-radius: 50%; transition: box-shadow .16s ease, transform .16s ease; }
+.category-legend .active i { box-shadow: 0 0 0 2px var(--color-surface-raised), 0 0 0 4px var(--category-color); transform: scale(1.2); }
 .category-legend b { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .category-legend strong { color: var(--color-text-primary); font-size: 12px; }
 .category-legend small { grid-column: 2 / 4; margin-top: 2px; color: var(--color-text-secondary); font-size: 11px; }
 .donut-panel { position: relative; display: grid; place-items: center; min-height: 230px; }
 .donut-chart { width: min(100%, 238px); overflow: visible; transform: rotate(-90deg); }
 .donut-track { fill: none; stroke: var(--color-surface-raised); stroke-width: 28; }
-.donut-segment { cursor: pointer; stroke-linecap: butt; transition: opacity .16s ease, stroke-width .16s ease; }
+.donut-segment { cursor: pointer; stroke-linecap: butt; touch-action: manipulation; transition: opacity .16s ease, stroke-width .16s ease; }
 .donut-chart:has(.donut-segment:hover) .donut-segment:not(:hover) { opacity: .35; }
-.donut-segment:hover, .donut-segment:focus-visible { outline: 0; stroke-width: 32; }
+.donut-chart.has-selection .donut-segment:not(.active) { opacity: .28; }
+.donut-segment:hover, .donut-segment:focus-visible, .donut-segment.active { outline: 0; stroke-width: 32; }
 .donut-center { position: absolute; display: grid; max-width: 124px; gap: 3px; text-align: center; pointer-events: none; }
 .donut-center b { font-size: 25px; letter-spacing: -0.05em; }
 .donut-center span { overflow: hidden; color: var(--color-text-primary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
@@ -271,4 +270,38 @@ onMounted(load)
 .empty { margin: 0; padding: 20px; color: var(--color-text-secondary); text-align: center; }
 @media (max-width: 1180px) { .quick-stats { grid-template-columns: repeat(3, 1fr); } }
 @media (max-width: 1080px) { .quick-stats { grid-template-columns: repeat(2, 1fr); } .month-card { min-height: 116px; } .category-visualization { grid-template-columns: minmax(230px, 1fr) 230px; gap: 18px; } }
+@media (max-width: 640px) {
+  .dashboard-header { align-items: center; }
+  .dashboard-header .month { width: 110px; font-size: 11px; }
+  .dashboard-summary { display: block; }
+  .balance-card { min-height: 132px; padding: 17px; border: 1px solid rgba(52, 211, 153, .22); background: #0c3b3d; box-shadow: none; }
+  .balance-card strong { margin-top: 8px; font-size: 27px; }
+  .balance-card small { display: block; margin-top: 8px; }
+  .month-card { margin-top: 12px; padding: 0; border: 0; background: transparent; }
+  .month-card header { display: none; }
+  .quick-stats { grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 0; }
+  .quick-stats > div { min-height: 76px; padding: 12px; border-radius: 11px; background: var(--color-surface); }
+  .quick-stats > div:nth-child(n+3) { display: none; }
+  .quick-stats b { margin-top: 7px; font-size: 15px; }
+  .flow-card { min-height: 210px; padding: 14px; border-radius: 12px; }
+  .flow-header { display: block; }
+  .flow-header h2 { font-size: 14px; }
+  .flow-header p { display: none; }
+  .flow-legend { margin-top: 7px; }
+  .chart-layout { grid-template-columns: 52px minmax(0, 1fr); height: 125px; }
+  .chart-scale { font-size: 9px; }
+  .graph-months { margin-left: 61px; }
+  .dashboard-bottom { grid-template-columns: 1fr; gap: 12px; }
+  .dashboard-module { border-radius: 12px; }
+  .alerts-module { display: none; }
+  .transactions-module li { grid-template-columns: 64px 1fr auto; padding: 12px 0; }
+  .transaction-date { font-size: 10px; white-space: nowrap; }
+  .category-ranking { padding: 14px; border-radius: 12px; }
+  .category-ranking header > span { display: none; }
+  .category-visualization { grid-template-columns: 1fr; gap: 5px; margin-top: 10px; }
+  .donut-panel { min-height: 185px; grid-row: 1; }
+  .donut-chart { width: 180px; }
+  .category-legend { grid-template-columns: repeat(2, 1fr); }
+  .category-legend button { padding: 7px 5px; }
+}
 </style>

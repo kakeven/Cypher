@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { Capacitor } from '@capacitor/core'
 import { IonApp } from '@ionic/vue'
@@ -10,6 +10,8 @@ import MobileTabBar from '@/components/MobileTabBar.vue'
 
 const route = useRoute()
 const isNative = Capacitor.isNativePlatform()
+const viewportWidth = ref(window.innerWidth)
+const isMobile = computed(() => isNative || viewportWidth.value <= 640)
 const isUnlocked = ref(!isNative)
 
 function applyTitle() {
@@ -17,17 +19,23 @@ function applyTitle() {
   document.title = route.meta?.title ? `${route.meta.title} · ${base}` : base
 }
 
-onMounted(applyTitle)
+function syncViewport() { viewportWidth.value = window.innerWidth }
+
+onMounted(() => {
+  applyTitle()
+  window.addEventListener('resize', syncViewport)
+})
+onBeforeUnmount(() => window.removeEventListener('resize', syncViewport))
 watch(() => route.meta?.title, applyTitle)
 </script>
 
 <template>
   <IonApp>
     <AppLock v-if="isNative && !isUnlocked" @unlocked="isUnlocked = true" />
-    <main v-else class="app-shell" :class="{ 'app-shell--mobile': isNative }">
-      <AppSidebar v-if="!isNative" />
+    <main v-else class="app-shell" :class="{ 'app-shell--mobile': isMobile }">
+      <AppSidebar v-if="!isMobile" />
       <section class="app-content"><RouterView v-slot="{ Component }"><component :is="Component" /></RouterView></section>
-      <MobileTabBar v-if="isNative" />
+      <MobileTabBar v-if="isMobile" />
       <AppToaster />
     </main>
   </IonApp>
@@ -62,11 +70,15 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .empty { color: var(--color-text-secondary); padding: 32px; text-align: center; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 @media (max-width: 1120px) { .app-content { padding: 24px 28px; } }
-.app-shell--mobile { display: block; min-height: 100dvh; padding-bottom: calc(58px + env(safe-area-inset-bottom)); }
-.app-shell--mobile .app-content { padding: max(20px, env(safe-area-inset-top)) 16px 28px; }
-.app-shell--mobile .page-header { gap: 14px; flex-wrap: wrap; }
+.app-shell--mobile { display: block; height: 100dvh; min-height: 0; overflow-x: hidden; overflow-y: auto; padding-bottom: calc(70px + env(safe-area-inset-bottom)); background: var(--color-bg); touch-action: pan-y; -webkit-overflow-scrolling: touch; }
+.app-shell--mobile .app-content { min-height: 100%; padding: max(18px, env(safe-area-inset-top)) 14px calc(98px + env(safe-area-inset-bottom)); }
+.app-shell--mobile .page-header { gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+.app-shell--mobile .page-header h1 { font-family: var(--font-family); font-size: 21px; font-weight: 700; letter-spacing: -0.045em; }
+.app-shell--mobile .page-header p { margin-top: 3px; font-size: 12px; }
 .app-shell--mobile .form-grid { grid-template-columns: 1fr; }
-.app-shell--mobile .card { padding: 16px; }
+.app-shell--mobile .card { padding: 14px; border-radius: 12px; box-shadow: 0 10px 24px rgba(0, 0, 0, .16); }
+.app-shell--mobile .button { min-height: 42px; border-radius: 10px; }
+.app-shell--mobile .input { min-height: 42px; border-radius: 10px; background: rgba(7, 15, 25, .52); }
 .app-shell--mobile .dashboard-summary,
 .app-shell--mobile .dashboard-bottom,
 .app-shell--mobile .category-visualization,

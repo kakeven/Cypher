@@ -269,4 +269,13 @@ onBeforeUnmount(() => {
 .context-menu button { border: 0; border-radius: 4px; padding: 8px 10px; color: var(--color-text-primary); text-align: left; background: transparent; cursor: pointer; font-size: 13px; }
 .context-menu button:hover { background: var(--color-surface); }
 .context-menu .danger { color: var(--color-danger); }
+@media (max-width: 640px) {
+  .totals { display: none; }
+  .form { padding: 14px; }
+  .goals { grid-template-columns: 1fr; gap: 10px; }
+  .goal { padding: 15px; }
+  .goal > b { margin: 13px 0 8px; }
+  .goal footer { margin-top: 12px; }
+  .details { padding: 14px; }
+}
 </style>

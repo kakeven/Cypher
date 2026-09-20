@@ -87,7 +87,7 @@ Cypher/
 - `CreditCard(id, name, brand, credit_limit, closing_day, due_day)`, `CreditCardInvoice`, `CreditCardPurchase` e `CreditCardInvoicePayment`.
 - Compatibilidade pontual no startup: adiciona `service_type` à tabela antiga `receivables` quando a coluna não existe.
 - Valores são armazenados como `Decimal`/`Numeric(12,2)` e serializados como número JSON.
-- CORS restrito a `http://localhost:5173` e `http://127.0.0.1:5173`.
+- CORS restrito aos previews locais do desktop e Android: `localhost` e `127.0.0.1` nas portas `5173` e `5174`.
 
 Regras de negócio efetivamente aplicadas:
 
@@ -173,7 +173,9 @@ Erros de domínio retornam `detail` em português com os códigos adequados, com
 - Cliente HTTP centralizado em `src/services/api.js`, incluindo normalização de mensagens de erro em português.
 - O frontend desktop mantém sua sidebar, rotas e dependências próprias em `frontend/`.
 - O Android é independente em `mobile/cypher-android`: Ionic Vue, Capacitor, SQLite local, biometria/PIN e uma camada de dados configurável. Leituras realizadas online ficam em cache SQLite para consulta offline; mutações offline aguardam a implementação do protocolo de sincronização LAN.
+- As telas Android de Visão geral, Transações, Orçamentos e Metas possuem uma primeira camada visual mobile inspirada na referência aprovada: paleta azul-escura, cartões compactos, barra de navegação inferior com ícones e listas/formulários ajustados para 393 px. Em Transações, o formulário é aberto sob demanda no mobile para priorizar o histórico.
 - O guia de desenvolvimento e instalação no aparelho Android, incluindo live reload e o tratamento de mudanças nativas, está em `mobile/cypher-android/README.md`.
+- O comando `pnpm --dir mobile/cypher-android android:usb` conecta um aparelho Android por ADB, redireciona Vite/API pelas portas 5173/8000 e inicia o Capacitor em live reload sem depender de Wi-Fi; o backend deve estar em execução antes de usá-lo.
 - Edições modulares Android são definidas por JSON: `mobile/cypher-android/src/modules/catalog.json` cataloga rotas, telas, navegação e dependências; `mobile/cypher-android/editions/*.json` seleciona módulos de entrada. O Vite inclui no bundle somente as views da edição ativa.
 
 ### Infraestrutura e qualidade
@@ -199,7 +201,7 @@ Prioridades e escopo devem ser confirmados contra o documento de requisitos e `s
 | Sincronização mobile | O cache e a fila local existem, mas o protocolo de sincronização LAN com o FastAPI ainda não foi implementado |
 | Desktop distribuível | Sem diretório Electron, `electron-builder`, runtime Python empacotado ou instaladores |
 | Visualização | Chart.js e Plotly não são dependências instaladas; dashboard não traz gráficos dessas bibliotecas |
-| Responsividade e acessibilidade | Não há versão mobile e não há uma auditoria de acessibilidade concluída |
+| Responsividade e acessibilidade | A primeira camada visual das quatro telas Android principais foi adaptada a 393 px; ainda faltam as demais áreas Android, auditoria de acessibilidade e QA com dados da API no navegador interno. |
 | Verificação visual | `design-qa.md` registra que a comparação com o protótipo foi bloqueada pela abertura local no navegador |
 
 ## Decisões e convenções registradas

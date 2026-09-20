@@ -234,4 +234,17 @@ onBeforeUnmount(() => {
 .edit-category-modal .color { width: 100%; }
 .close-modal { border: 0; color: var(--color-text-secondary); background: transparent; cursor: pointer; font-size: 22px; line-height: 1; }
 .modal-actions { display: flex; justify-content: end; gap: 8px; margin-top: 4px; }
+@media (max-width: 640px) {
+  .month { width: 116px; font-size: 11px; }
+  .add-category { align-items: stretch; padding: 14px; }
+  .add-category h2 { width: 100%; font-size: 14px; }
+  .add-category form { width: 100%; }
+  .add-category form .input { flex: 1; min-width: 0; }
+  .add-category .button { width: 100%; }
+  .budget-grid { grid-template-columns: 1fr; gap: 10px; }
+  .budget-grid .card { padding: 14px; }
+  .spent { margin: 14px 0 7px; font-size: 17px; }
+  .status { margin-bottom: 13px; }
+  .budget-form { margin-top: 8px; }
+}
 </style>

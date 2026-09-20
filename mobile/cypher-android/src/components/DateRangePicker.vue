@@ -6,6 +6,7 @@ const props = defineProps({
   start: { type: String, default: '' },
   end: { type: String, default: '' },
   max: { type: String, default: todayISO() },
+  compact: { type: Boolean, default: false },
 })
 const emit = defineEmits(['update:start', 'update:end', 'change'])
 const open = ref(false)
@@ -74,13 +75,15 @@ function finish() {
 </script>
 
 <template>
-  <button type="button" class="range-trigger" :class="{ selected: start }" :aria-expanded="open" @click="openPicker">
+  <button type="button" class="range-trigger" :class="{ selected: start, compact }" :aria-label="compact ? 'Selecionar período' : undefined" :title="compact ? 'Selecionar período' : undefined" :aria-expanded="open" @click="openPicker">
     <svg class="range-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
       <rect x="3" y="4.5" width="18" height="16.5" rx="2" />
       <path d="M8 2.5v4M16 2.5v4M3 9h18M8 13h.01M12 13h.01M16 13h.01M8 17h.01M12 17h.01M16 17h.01" />
     </svg>
-    <span v-if="start">{{ formatDateBR(start) }} <i>até</i> {{ end ? formatDateBR(end) : '…' }}</span>
-    <span v-else>Selecionar período</span>
+    <template v-if="!compact">
+      <span v-if="start">{{ formatDateBR(start) }} <i>até</i> {{ end ? formatDateBR(end) : '…' }}</span>
+      <span v-else>Selecionar período</span>
+    </template>
   </button>
 
   <Teleport to="body">
@@ -105,6 +108,7 @@ function finish() {
 
 <style scoped>
 .range-trigger { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; border: 1px solid var(--color-border); border-radius: 6px; padding: 7px 10px; color: var(--color-text-secondary); background: transparent; cursor: pointer; font-size: 12px; white-space: nowrap; }
+.range-trigger.compact { justify-content: center; width: 36px; padding: 7px; }
 .range-trigger:hover, .range-trigger.selected { color: var(--color-text-primary); border-color: var(--color-border-strong); background: var(--color-surface-raised); }
 .range-trigger.selected { border-color: var(--color-accent); }
 .range-icon { width: 16px; height: 16px; flex: 0 0 auto; color: var(--color-accent-bright); } .range-trigger i { color: var(--color-text-muted); font-style: normal; }

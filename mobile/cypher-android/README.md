@@ -27,6 +27,16 @@ Abra a URL indicada pelo Vite. Esse modo é útil para desenvolvimento rápido, 
 
 O live reload atualiza Vue, CSS e JavaScript no aparelho conectado. Ele não recria código Java/Kotlin, Gradle nem plugins nativos.
 
+### USB, sem depender de Wi-Fi
+
+Com Docker em execução, conecte um único aparelho com a Depuração USB autorizada e execute:
+
+```powershell
+pnpm android:usb
+```
+
+O comando inicia o backend e o Vite Android no Docker, aplica `adb reverse` da porta `5173` do celular para a porta `5174` do computador e redireciona a API pela porta `8000`. Depois abre o app pelo Capacitor com live reload. Salve os arquivos em `src/` para atualizar o WebView. Use `Ctrl+C` para encerrar o live reload; os serviços Docker permanecem ativos para a próxima execução. Se o Vite Docker não subir, o comando mostra os logs antes de tentar abrir o app.
+
 1. Conecte o aparelho via USB e execute `adb devices`.
 2. Garanta que computador e aparelho estejam na mesma rede Wi-Fi.
 3. Descubra o IPv4 local do computador com `ipconfig`.

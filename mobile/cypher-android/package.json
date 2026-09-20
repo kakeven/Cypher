@@ -16,6 +16,7 @@
     "android:essentials": "pnpm build:essentials && cap sync android",
     "android:saas": "pnpm build:saas && cap sync android",
     "android:open": "cap open android",
+    "android:usb": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/android-usb.ps1",
     "lint": "run-s \"lint:*\"",
     "lint:oxlint": "oxlint . --fix",
     "lint:eslint": "eslint . --fix --cache",
@@ -31,6 +32,7 @@
     "@capacitor/network": "^8.0.1",
     "@ionic/vue": "^9.0.4",
     "@ionic/vue-router": "^9.0.4",
+    "ionicons": "^8.1.0",
     "pinia": "^3.0.4",
     "vue": "^3.5.38",
     "vue-router": "^5.1.0"
