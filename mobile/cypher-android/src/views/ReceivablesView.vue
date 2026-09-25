@@ -26,7 +26,6 @@ async function load() {
     const receivables = await api.receivables()
     items.value = receivables
     if (selected.value) selected.value = await api.receivable(selected.value.id)
-    else if (receivables.length) selected.value = await api.receivable(receivables[0].id)
   } catch (e) {
     error.value = e.message
   } finally {
@@ -54,6 +53,10 @@ async function create() {
 function resetForm() {
   editingId.value = null
   Object.assign(form, { name: '', client: '', total_amount: '', service_type: '' })
+}
+
+function closeDetails() {
+  selected.value = null
 }
 
 function openContextMenu(event, item) {
@@ -116,12 +119,18 @@ onMounted(() => {
   load()
   window.addEventListener('click', closeContextMenu)
   window.addEventListener('scroll', closeContextMenu, true)
+  window.addEventListener('keydown', handleKeydown)
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('click', closeContextMenu)
   window.removeEventListener('scroll', closeContextMenu, true)
+  window.removeEventListener('keydown', handleKeydown)
 })
+
+function handleKeydown(event) {
+  if (event.key === 'Escape') closeDetails()
+}
 </script>
 
 <template>
@@ -176,18 +185,21 @@ onBeforeUnmount(() => {
 
     <section v-else class="receivable-workspace">
       <aside class="receivable-list" aria-label="Projetos a receber">
-        <button v-for="item in items" :key="item.id" :class="['receivable', { active: selected?.id === item.id, paid: item.is_paid }]" type="button" @click="choose(item)" @contextmenu.prevent="openContextMenu($event, item)">
+        <article v-for="item in items" :key="item.id" :class="['receivable', { paid: item.is_paid }]" @contextmenu.prevent="openContextMenu($event, item)">
           <span class="receivable-kind">{{ item.service_type }}</span>
           <b>{{ item.name }}</b>
           <small>{{ item.client || 'Cliente não informado' }}</small>
           <strong>{{ brl(item.received_amount) }} <em>de {{ brl(item.total_amount) }}</em></strong>
           <span class="track" :aria-label="`${item.progress}% recebido`"><i :style="{ width: `${item.progress}%` }" /></span>
           <footer><span>{{ item.progress }}% recebido</span><span>{{ brl(item.remaining_amount) }} pendente</span></footer>
-        </button>
+          <footer class="receivable-actions"><button type="button" class="link" @click="choose(item)">Ver detalhes</button><button type="button" class="link" aria-haspopup="menu" @click.stop="openContextMenu($event, item)">Ações</button></footer>
+        </article>
       </aside>
+    </section>
 
-      <section v-if="selected" class="card details">
-        <header><div><span class="receivable-kind">{{ selected.service_type }}</span><h2>{{ selected.name }}</h2><p>{{ selected.client || 'Cliente não informado' }} · {{ brl(selected.remaining_amount) }} pendente</p></div></header>
+    <div v-if="selected" class="modal-backdrop" @click.self="closeDetails">
+      <section class="card details" role="dialog" aria-modal="true" :aria-labelledby="`receivable-details-${selected.id}`">
+        <header><div><span class="receivable-kind">{{ selected.service_type }}</span><h2 :id="`receivable-details-${selected.id}`">{{ selected.name }}</h2><p>{{ selected.client || 'Cliente não informado' }} · {{ brl(selected.remaining_amount) }} pendente</p></div><button type="button" class="close-modal" @click="closeDetails">← <span>Voltar</span></button></header>
         <div class="details-value"><span>Recebido</span><strong>{{ brl(selected.received_amount) }} <em>de {{ brl(selected.total_amount) }}</em></strong><div class="track"><i :style="{ width: `${selected.progress}%` }" /></div></div>
         <form v-if="!selected.is_paid" class="payment-form" @submit.prevent="addPayment">
           <label>
@@ -210,7 +222,7 @@ onBeforeUnmount(() => {
         </ul>
         <p v-else class="empty">Ainda não há recebimentos registrados.</p>
       </section>
-    </section>
+    </div>
 
     <div v-if="contextMenu" class="context-menu" :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }" role="menu" @click.stop>
       <button type="button" role="menuitem" @click="editReceivable">Editar</button>
@@ -261,20 +273,16 @@ onBeforeUnmount(() => {
 .summary-values { gap: 12px; }
 .summary-values span { min-width: 118px; padding: 9px 11px; border: 1px solid var(--color-border); border-radius: 6px; background: var(--color-surface); }
 .summary-values b { color: var(--color-text-primary); font-family: var(--font-family); font-size: 13px; letter-spacing: -0.02em; }
-.receivable-workspace { display: grid; grid-template-columns: minmax(260px, 0.72fr) minmax(0, 1.4fr); gap: 12px; }
-.receivable-list { display: grid; align-content: start; gap: 8px; }
+.receivable-workspace { display: block; }
+.receivable-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-content: start; gap: 12px; }
 .receivable {
-  width: 100%;
   padding: 15px;
   border: 1px solid var(--color-border);
   border-radius: 8px;
   color: var(--color-text-primary);
-  text-align: left;
   background: var(--color-surface);
-  cursor: pointer;
 }
-.receivable:hover, .receivable.active { border-color: var(--color-border-strong); background: var(--color-surface-raised); }
-.receivable.active { box-shadow: inset 3px 0 var(--color-accent); }
+.receivable:hover { border-color: var(--color-border-strong); background: var(--color-surface-raised); }
 .receivable.paid { border-color: var(--color-success); }
 .receivable-kind { display: inline-block; padding: 3px 6px; border-radius: 4px; color: var(--color-accent-bright); background: var(--color-accent-bg); font-size: 10px; }
 .receivable > b { display: block; margin: 11px 0 3px; font-size: 15px; }
@@ -283,10 +291,14 @@ onBeforeUnmount(() => {
 .receivable > strong em, .details-value em { color: var(--color-text-secondary); font-size: 11px; font-style: normal; font-weight: 400; letter-spacing: 0; }
 .receivable .track { display: block; }
 .receivable footer { display: flex; justify-content: space-between; gap: 6px; margin-top: 9px; color: var(--color-text-secondary); font-size: 10px; }
-.details { min-height: 100%; margin: 0; padding: 0; overflow: hidden; }
+.receivable .link { margin-top: 15px; padding: 0; }
+.modal-backdrop { position: fixed; z-index: 30; inset: 0; display: grid; place-items: center; padding: 18px; background: rgba(6, 9, 15, .72); }
+.details { width: min(760px, 100%); max-height: calc(100dvh - 36px); margin: 0; padding: 0; overflow: auto; }
 .details > header { padding: 20px; border-bottom: 1px solid var(--color-border); }
 .details > header h2 { margin: 10px 0 4px; font-size: 19px; }
 .details > header p { margin: 0; color: var(--color-text-secondary); font-size: 12px; }
+.details > header { align-items: start; }
+.close-modal { border: 0; color: var(--color-text-secondary); background: transparent; cursor: pointer; font-size: 24px; line-height: 1; }
 .details-value { padding: 18px 20px; border-bottom: 1px solid var(--color-border); }
 .details-value > span { color: var(--color-text-secondary); font-size: 11px; }
 .details-value strong { display: block; margin: 6px 0 12px; font-size: 24px; letter-spacing: -0.04em; }
@@ -298,5 +310,25 @@ onBeforeUnmount(() => {
 .payment-list li { display: grid; grid-template-columns: 110px 1fr auto; gap: 12px; align-items: center; padding: 13px 0; color: var(--color-text-secondary); }
 .payment-list time { color: var(--color-text-muted); font-size: 11px; }
 .payment-list b { color: var(--color-success); font-family: var(--font-family); font-size: 13px; }
-@media (max-width: 1120px) { .receivable-workspace { grid-template-columns: 1fr; } .receivable-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 1120px) { .receivable-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) {
+  .receivable-actions { justify-content: flex-start; gap: 12px; }
+  .receivable-actions .link { min-height: 44px; padding: 8px 10px; }
+  .modal-backdrop { z-index: 40; display: block; padding: 0; overflow: auto; background: var(--color-bg); }
+  .details { width: 100%; min-height: 100dvh; max-height: none; border: 0; border-radius: 0; box-shadow: none; }
+  .details > header { position: sticky; top: 0; z-index: 1; align-items: center; padding: max(18px, env(safe-area-inset-top)) 14px 14px; background: var(--color-bg); }
+  .details > header .receivable-kind, .details > header p { display: none; }
+  .details > header h2 { margin: 0; font-size: 18px; }
+  .close-modal { order: -1; display: flex; align-items: center; gap: 6px; min-height: 42px; padding: 0; color: var(--color-accent-bright); font-size: 14px; font-weight: 650; }
+  .details-value, .payment-form { padding-right: 14px; padding-left: 14px; }
+  .details .payment-form { grid-template-columns: 1fr; gap: 14px; align-items: stretch; }
+  .details .payment-form .input, .details .payment-form .button { width: 100%; }
+  .details .payment-form .button { min-height: 48px; margin-top: 2px; }
+  .details .payment-form :deep(.date-input) { min-width: 0; }
+  .payment-list { padding: 0 14px calc(22px + env(safe-area-inset-bottom)); }
+}
+:global(.app-shell--mobile) .details .payment-form { grid-template-columns: 1fr; gap: 14px; align-items: stretch; }
+:global(.app-shell--mobile) .details .payment-form .input, :global(.app-shell--mobile) .details .payment-form .button { width: 100%; }
+:global(.app-shell--mobile) .details .payment-form .button { min-height: 48px; }
+:global(.app-shell--mobile) .details .payment-form :deep(.date-input) { min-width: 0; }
 </style>

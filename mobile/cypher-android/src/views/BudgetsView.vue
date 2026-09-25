@@ -65,6 +65,13 @@ function closeContextMenu() {
   contextMenu.value = null
 }
 
+function handleKeydown(event) {
+  if (event.key === 'Escape') {
+    editingCategory.value = null
+    contextMenu.value = null
+  }
+}
+
 function editCategory() {
   const item = contextMenu.value?.item
   if (!item) return
@@ -123,11 +130,13 @@ onMounted(() => {
   load()
   window.addEventListener('click', closeContextMenu)
   window.addEventListener('scroll', closeContextMenu, true)
+  window.addEventListener('keydown', handleKeydown)
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('click', closeContextMenu)
   window.removeEventListener('scroll', closeContextMenu, true)
+  window.removeEventListener('keydown', handleKeydown)
 })
 </script>
 
@@ -178,12 +187,13 @@ onBeforeUnmount(() => {
           <input :id="`limit-${item.id}`" v-model="values[item.id]" class="input" min="0.01" step="0.01" placeholder="Limite mensal" type="number" />
           <button class="button button--ghost">Salvar</button>
         </form>
+        <button type="button" class="link budget-actions" aria-haspopup="menu" @click.stop="openContextMenu($event, item)">Ações da categoria</button>
       </article>
     </section>
 
     <div v-if="editingCategory" class="modal-backdrop" @click.self="editingCategory = null">
-      <form class="edit-category-modal" @submit.prevent="updateCategory">
-        <header><div><h2>Editar categoria</h2><p>Altere o nome ou a cor usada nos gráficos.</p></div><button type="button" class="close-modal" aria-label="Fechar" @click="editingCategory = null">×</button></header>
+      <form class="edit-category-modal" role="dialog" aria-modal="true" aria-labelledby="edit-category-title" @submit.prevent="updateCategory">
+        <header><div><h2 id="edit-category-title">Editar categoria</h2><p>Altere o nome ou a cor usada nos gráficos.</p></div><button type="button" class="close-modal" aria-label="Fechar" @click="editingCategory = null">×</button></header>
         <label>Nome<input v-model="categoryEdit.name" class="input" maxlength="50" required /></label>
         <label>Cor<input v-model="categoryEdit.color" class="color" required type="color" /></label>
         <div class="modal-actions"><button type="button" class="button button--ghost" @click="editingCategory = null">Cancelar</button><button class="button">Salvar alterações</button></div>
@@ -246,5 +256,8 @@ onBeforeUnmount(() => {
   .spent { margin: 14px 0 7px; font-size: 17px; }
   .status { margin-bottom: 13px; }
   .budget-form { margin-top: 8px; }
+  .budget-actions { display: inline-flex; min-height: 44px; align-items: center; margin-top: 4px; padding: 8px 10px; color: var(--color-accent-bright); }
+  .modal-backdrop { align-items: start; overflow-y: auto; padding: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom)); }
+  .edit-category-modal { max-height: calc(100dvh - 24px); overflow-y: auto; align-self: center; padding: 16px; }
 }
 </style>

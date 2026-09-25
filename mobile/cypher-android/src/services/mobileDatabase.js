@@ -29,6 +29,12 @@ export async function initializeMobileDatabase() {
       updated_at TEXT NOT NULL
     );
   `)
+  await database.execute(`
+    CREATE TABLE IF NOT EXISTS app_state (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      body TEXT NOT NULL
+    );
+  `)
   return database
 }
 
@@ -46,4 +52,23 @@ export async function readCachedResponse(key) {
   if (!db) return undefined
   const result = await db.query('SELECT body FROM response_cache WHERE key = ?', [key])
   return result.values?.[0] ? JSON.parse(result.values[0].body) : undefined
+}
+
+const storageKey = 'cypher.mobile.local-state'
+
+export async function readLocalState() {
+  const fallback = localStorage.getItem(storageKey)
+  if (!Capacitor.isNativePlatform()) return fallback ? JSON.parse(fallback) : null
+  const db = await initializeMobileDatabase()
+  const result = await db.query('SELECT body FROM app_state WHERE id = 1')
+  return result.values?.[0] ? JSON.parse(result.values[0].body) : null
+}
+
+export async function writeLocalState(state) {
+  if (!Capacitor.isNativePlatform()) {
+    localStorage.setItem(storageKey, JSON.stringify(state))
+    return
+  }
+  const db = await initializeMobileDatabase()
+  await db.run('INSERT OR REPLACE INTO app_state (id, body) VALUES (1, ?)', [JSON.stringify(state)])
 }

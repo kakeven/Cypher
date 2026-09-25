@@ -230,6 +230,7 @@ onBeforeUnmount(() => {
             <th scope="col">Categoria</th>
             <th scope="col">Tipo</th>
             <th scope="col" class="amount">Valor</th>
+            <th scope="col" class="row-actions-heading">Ações</th>
           </tr>
         </thead>
         <tbody>
@@ -241,6 +242,7 @@ onBeforeUnmount(() => {
             <td class="amount" :class="item.type === 'income' ? 'positive' : 'negative'">
               <span :aria-label="item.type === 'income' ? 'Receita de' : 'Despesa de'">{{ item.type === 'income' ? '+' : '-' }} {{ brl(item.amount) }}</span>
             </td>
+            <td class="row-actions"><button type="button" class="link" aria-haspopup="menu" @click.stop="openContextMenu($event, item)">Ações</button></td>
           </tr>
         </tbody>
       </table>
@@ -315,5 +317,7 @@ th.amount, td.amount { text-align: right; }
   td.description-cell { grid-column: 1; grid-row: 1; font-size: 13px; }
   td.category-cell { grid-column: 1; grid-row: 2; font-size: 11px; }
   td.amount { grid-column: 2; grid-row: 1 / span 2; align-self: center; font-size: 13px; }
+  td.row-actions { display: block; grid-column: 1 / -1; grid-row: 3; justify-self: end; }
+  .row-actions .link { min-height: 44px; padding: 8px 12px; }
 }
 </style>

@@ -78,6 +78,10 @@ function reset() {
   form.value = { name: '', target_amount: '', deadline: '', description: '' }
 }
 
+function closeDetails() {
+  selected.value = null
+}
+
 async function addDeposit() {
   if (!selected.value) return
   try {
@@ -129,12 +133,18 @@ onMounted(() => {
   load()
   window.addEventListener('click', closeContextMenu)
   window.addEventListener('scroll', closeContextMenu, true)
+  window.addEventListener('keydown', handleKeydown)
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('click', closeContextMenu)
   window.removeEventListener('scroll', closeContextMenu, true)
+  window.removeEventListener('keydown', handleKeydown)
 })
+
+function handleKeydown(event) {
+  if (event.key === 'Escape') closeDetails()
+}
 </script>
 
 <template>
@@ -203,7 +213,8 @@ onBeforeUnmount(() => {
             <span v-if="goal.deadline">· até {{ formatDateBR(goal.deadline) }}</span>
           </p>
           <footer>
-            <button type="button" class="link" @click="choose(goal)">Ver depósitos</button>
+            <button type="button" class="link" @click="choose(goal)">Ver detalhes</button>
+            <button type="button" class="link goal-actions" aria-haspopup="menu" @click.stop="openContextMenu($event, goal)">Ações</button>
           </footer>
         </article>
       </div>
@@ -214,25 +225,39 @@ onBeforeUnmount(() => {
       <button type="button" class="danger" role="menuitem" @click="deleteGoal">Excluir</button>
     </div>
 
-    <section v-if="selected" class="card details" aria-live="polite">
-      <h2>{{ selected.name }} — depósitos</h2>
-      <form class="deposit" @submit.prevent="addDeposit">
-        <label class="sr-only" for="deposit-amount">Valor do depósito</label>
-        <input id="deposit-amount" v-model="deposit.amount" class="input" min="0.01" step="0.01" required placeholder="Valor" type="number" />
-        <label class="sr-only" for="deposit-month">Mês de referência</label>
-        <DateInput id="deposit-month" v-model="deposit.reference_month" type="month" required aria-label="Mês de referência" />
-        <label class="sr-only" for="deposit-note">Observação</label>
-        <input id="deposit-note" v-model="deposit.note" class="input" maxlength="250" placeholder="Observação (opcional)" />
-        <button class="button">Adicionar</button>
-      </form>
-      <ul v-if="selected.deposits?.length">
-        <li v-for="item in selected.deposits" :key="item.id">
-          <span>{{ item.reference_month }} <small v-if="item.note">· {{ item.note }}</small></span>
-          <b>{{ brl(item.amount) }}</b>
-        </li>
-      </ul>
-      <p v-else class="empty" role="status">Nenhum depósito registrado.</p>
-    </section>
+    <div v-if="selected" class="modal-backdrop" @click.self="closeDetails">
+      <section class="card details" role="dialog" aria-modal="true" :aria-labelledby="`goal-details-${selected.id}`">
+        <header class="details-header">
+          <div>
+            <h2 :id="`goal-details-${selected.id}`">{{ selected.name }}</h2>
+            <p>Depósitos: {{ brl(selected.saved_amount) }} de {{ brl(selected.target_amount) }}</p>
+          </div>
+          <button type="button" class="close-modal" @click="closeDetails">← <span>Voltar</span></button>
+        </header>
+        <form class="deposit" @submit.prevent="addDeposit">
+          <label>
+            Valor do depósito
+            <input id="deposit-amount" v-model="deposit.amount" class="input" min="0.01" step="0.01" required placeholder="0,00" type="number" />
+          </label>
+          <label>
+            Mês de referência
+            <DateInput id="deposit-month" v-model="deposit.reference_month" type="month" required aria-label="Mês de referência" />
+          </label>
+          <label>
+            Observação <span>(opcional)</span>
+            <input id="deposit-note" v-model="deposit.note" class="input" maxlength="250" placeholder="Ex.: valor separado este mês" />
+          </label>
+          <button class="button">Adicionar depósito</button>
+        </form>
+        <ul v-if="selected.deposits?.length">
+          <li v-for="item in selected.deposits" :key="item.id">
+            <span>{{ item.reference_month }} <small v-if="item.note">· {{ item.note }}</small></span>
+            <b>{{ brl(item.amount) }}</b>
+          </li>
+        </ul>
+        <p v-else class="empty" role="status">Nenhum depósito registrado.</p>
+      </section>
+    </div>
   </div>
 </template>
 
@@ -258,8 +283,15 @@ onBeforeUnmount(() => {
 .link { border: 0; background: none; color: var(--color-accent); cursor: pointer; padding: 0 5px; font-size: 13px; }
 .link:hover { color: var(--color-accent-bright); text-decoration: underline; text-underline-offset: 3px; }
 .link--danger { color: var(--color-danger); }
-.details { margin-top: 18px; }
+.modal-backdrop { position: fixed; z-index: 30; inset: 0; display: grid; place-items: center; padding: 18px; background: rgba(6, 9, 15, .72); }
+.details { width: min(760px, 100%); max-height: calc(100dvh - 36px); overflow: auto; }
+.details-header { display: flex; justify-content: space-between; gap: 18px; margin-bottom: 18px; }
+.details-header h2 { margin-bottom: 5px; }
+.details-header p { margin: 0; color: var(--color-text-secondary); font-size: 13px; }
+.close-modal { border: 0; color: var(--color-text-secondary); background: transparent; cursor: pointer; font-size: 24px; line-height: 1; }
 .deposit { display: grid; grid-template-columns: 1fr 1fr 2fr auto; gap: 8px; align-items: center; }
+.deposit label { display: grid; gap: 7px; color: var(--color-text-secondary); font-size: 13px; }
+.deposit label span { color: var(--color-text-muted); }
 .deposit .month { width: 100%; }
 .details ul { list-style: none; padding: 0; margin: 18px 0 0; }
 .details li { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--color-border); color: var(--color-text-secondary); }
@@ -276,6 +308,20 @@ onBeforeUnmount(() => {
   .goal { padding: 15px; }
   .goal > b { margin: 13px 0 8px; }
   .goal footer { margin-top: 12px; }
-  .details { padding: 14px; }
+  .goal footer .link { min-height: 44px; padding: 8px 10px; }
+  .modal-backdrop { z-index: 40; display: block; padding: 0; overflow: auto; background: var(--color-bg); }
+  .details { width: 100%; min-height: 100dvh; max-height: none; border: 0; border-radius: 0; padding: max(18px, env(safe-area-inset-top)) 14px calc(22px + env(safe-area-inset-bottom)); box-shadow: none; }
+  .details-header { position: sticky; top: calc(-1 * max(18px, env(safe-area-inset-top))); z-index: 1; align-items: center; margin: calc(-1 * max(18px, env(safe-area-inset-top))) -14px 18px; padding: max(18px, env(safe-area-inset-top)) 14px 14px; border-bottom: 1px solid var(--color-border); background: var(--color-bg); }
+  .details-header h2 { margin: 0; font-size: 18px; }
+  .details-header p { display: none; }
+  .close-modal { order: -1; display: flex; align-items: center; gap: 6px; min-height: 42px; padding: 0; color: var(--color-accent-bright); font-size: 14px; font-weight: 650; }
+  .details .deposit { grid-template-columns: 1fr; gap: 14px; align-items: stretch; }
+  .details .deposit label { gap: 7px; font-size: 13px; }
+  .details .deposit .input, .details .deposit .button { width: 100%; }
+  .details .deposit .button { margin-top: 2px; }
+  .details .deposit :deep(.date-input) { min-width: 0; }
 }
+:global(.app-shell--mobile) .details .deposit { grid-template-columns: 1fr; gap: 14px; align-items: stretch; }
+:global(.app-shell--mobile) .details .deposit .input, :global(.app-shell--mobile) .details .deposit .button { width: 100%; }
+:global(.app-shell--mobile) .details .deposit :deep(.date-input) { min-width: 0; }
 </style>

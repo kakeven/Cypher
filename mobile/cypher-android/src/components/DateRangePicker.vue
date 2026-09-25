@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { formatDateBR, todayISO } from '@/utils/format'
 
 const props = defineProps({
@@ -72,6 +72,14 @@ function finish() {
   if (props.start) emit('change')
   open.value = false
 }
+function handleKeydown(event) {
+  if (event.key === 'Escape') open.value = false
+}
+watch(open, (isOpen) => {
+  if (isOpen) window.addEventListener('keydown', handleKeydown)
+  else window.removeEventListener('keydown', handleKeydown)
+})
+onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
 </script>
 
 <template>
@@ -121,4 +129,16 @@ function finish() {
 .days { padding-bottom: 16px; } .day-slot { display: grid; place-items: center; height: 38px; background: transparent; } .day-slot button { width: 32px; height: 32px; border: 0; border-radius: 5px; color: var(--color-text-primary); background: transparent; cursor: pointer; font-size: 12px; } .day-slot button:hover:not(:disabled) { background: var(--color-surface-raised); }
 .day-slot button:disabled { color: var(--color-text-muted); cursor: not-allowed; opacity: 0.42; } .day-slot button.between { width: 100%; border-radius: 0; color: var(--color-accent-bright); background: var(--color-accent-bg); } .day-slot button.start, .day-slot button.end { color: #fff; background: var(--color-accent); } .day-slot button.start { border-radius: 5px 0 0 5px; } .day-slot button.end { border-radius: 0 5px 5px 0; } .day-slot button.start.end { border-radius: 5px; }
 .range-dialog footer { display: flex; justify-content: space-between; padding: 12px 18px; border-top: 1px solid var(--color-border); } .range-dialog footer button { border: 0; padding: 7px 9px; border-radius: 5px; cursor: pointer; font-size: 12px; } .clear { color: var(--color-text-secondary); background: transparent; } .clear:disabled { opacity: 0.45; cursor: not-allowed; } .done { color: #fff; background: var(--color-accent); }
+@media (max-width: 640px) {
+  .range-overlay { place-items: end center; padding: 12px; }
+  .range-dialog { width: 100%; max-width: 420px; border-radius: 16px 16px 10px 10px; padding-bottom: env(safe-area-inset-bottom); }
+  .range-dialog header { padding: 16px 16px 12px; }
+  .close, .calendar-nav button { min-width: 44px; min-height: 44px; }
+  .calendar-nav { grid-template-columns: 44px 1fr 44px; padding: 12px 14px 8px; }
+  .weekdays, .days { padding-right: 12px; padding-left: 12px; }
+  .day-slot { height: 42px; }
+  .day-slot button { width: 36px; height: 36px; }
+  .range-dialog footer { padding: 12px 14px; }
+  .range-dialog footer button { min-height: 44px; padding: 10px 12px; }
+}
 </style>

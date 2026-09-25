@@ -1,5 +1,9 @@
 # Cypher Android
 
+## Dados locais
+
+O Android é autônomo: todos os dados financeiros ficam no SQLite criptografado do aparelho e não há conexão automática com a API do desktop. No navegador, utilizado apenas para desenvolvimento, os dados ficam no armazenamento local do navegador. Sincronização sob comando do usuário será acrescentada em uma etapa futura.
+
 Aplicativo Android independente do Cypher Desktop, desenvolvido com Ionic Vue e Capacitor. O projeto Gradle está em `android/`; o código Vue e o catálogo de módulos estão em `src/`.
 
 ## Pré-requisitos
@@ -35,26 +39,16 @@ Com Docker em execução, conecte um único aparelho com a Depuração USB autor
 pnpm android:usb
 ```
 
-O comando inicia o backend e o Vite Android no Docker, aplica `adb reverse` da porta `5173` do celular para a porta `5174` do computador e redireciona a API pela porta `8000`. Depois abre o app pelo Capacitor com live reload. Salve os arquivos em `src/` para atualizar o WebView. Use `Ctrl+C` para encerrar o live reload; os serviços Docker permanecem ativos para a próxima execução. Se o Vite Docker não subir, o comando mostra os logs antes de tentar abrir o app.
+O comando inicia somente o Vite Android no Docker, aplica `adb reverse` da porta `5173` do celular para a porta `5174` do computador e abre o app pelo Capacitor com live reload. Salve os arquivos em `src/` para atualizar o WebView. Use `Ctrl+C` para encerrar o live reload; os serviços Docker permanecem ativos para a próxima execução. Se o Vite Docker não subir, o comando mostra os logs antes de tentar abrir o app.
 
 1. Conecte o aparelho via USB e execute `adb devices`.
-2. Garanta que computador e aparelho estejam na mesma rede Wi-Fi.
-3. Descubra o IPv4 local do computador com `ipconfig`.
-4. Crie `./.env.local` — esse arquivo é local e não deve ser versionado:
-
-```env
-VITE_API_URL=http://192.168.X.X:8000/api
-```
-
-Substitua `192.168.X.X` pelo IPv4 do computador. No aparelho, `127.0.0.1` aponta para o próprio aparelho, e não para o backend do computador.
-
-Em um terminal, inicie o Vite acessível pela rede:
+2. Em um terminal, inicie o Vite:
 
 ```powershell
 pnpm dev -- --host 0.0.0.0
 ```
 
-Em outro terminal, instale e execute a build de desenvolvimento no aparelho com live reload:
+3. Em outro terminal, instale e execute a build de desenvolvimento no aparelho com live reload:
 
 ```powershell
 pnpm exec cap run android --live-reload --port 5173

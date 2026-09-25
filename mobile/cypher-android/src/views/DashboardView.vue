@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { api } from '@/services/api'
-import { brl, formatDateBR, currentMonth, monthRange } from '@/utils/format'
+import { brl, formatDateBR, currentMonth } from '@/utils/format'
 import DateInput from '@/components/DateInput.vue'
 
 const period = ref(currentMonth())
@@ -20,7 +20,7 @@ const monthlyValues = computed(() => data.value?.monthly_evolution || [])
 const chartMaximum = computed(() => Math.max(1, ...monthlyValues.value.flatMap((item) => [item.income, item.expense])))
 function chartPoints(field) {
   const values = monthlyValues.value.filter((item) => item.month <= period.value)
-  return values.map((item, index) => {
+  return values.map((item) => {
     const x = 2 + (monthlyValues.value.findIndex((value) => value.month === item.month) / Math.max(1, monthlyValues.value.length - 1)) * 96
     const y = 96 - (Number(item[field]) / chartMaximum.value) * 90
     return `${x},${y}`
@@ -281,8 +281,9 @@ onMounted(load)
   .month-card header { display: none; }
   .quick-stats { grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 0; }
   .quick-stats > div { min-height: 76px; padding: 12px; border-radius: 11px; background: var(--color-surface); }
-  .quick-stats > div:nth-child(n+3) { display: none; }
   .quick-stats b { margin-top: 7px; font-size: 15px; }
+  .alerts-module { display: block; }
+  .alerts-module ul { padding: 0 14px 8px; }
   .flow-card { min-height: 210px; padding: 14px; border-radius: 12px; }
   .flow-header { display: block; }
   .flow-header h2 { font-size: 14px; }

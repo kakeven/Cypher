@@ -172,8 +172,8 @@ Erros de domínio retornam `detail` em português com os códigos adequados, com
 - Assinaturas SaaS oferece uma área única com abas de contratos, cobranças, clientes e catálogo. Permite cadastrar e editar contratos mensais/trimestrais/semestrais/anuais pelo menu de contexto, gerar cobranças, receber parcial ou integralmente, pausar, retomar, cancelar e estornar baixas com confirmação.
 - Cliente HTTP centralizado em `src/services/api.js`, incluindo normalização de mensagens de erro em português.
 - O frontend desktop mantém sua sidebar, rotas e dependências próprias em `frontend/`.
-- O Android é independente em `mobile/cypher-android`: Ionic Vue, Capacitor, SQLite local, biometria/PIN e uma camada de dados configurável. Leituras realizadas online ficam em cache SQLite para consulta offline; mutações offline aguardam a implementação do protocolo de sincronização LAN.
-- As telas Android de Visão geral, Transações, Orçamentos e Metas possuem uma primeira camada visual mobile inspirada na referência aprovada: paleta azul-escura, cartões compactos, barra de navegação inferior com ícones e listas/formulários ajustados para 393 px. Em Transações, o formulário é aberto sob demanda no mobile para priorizar o histórico.
+- O Android é independente em `mobile/cypher-android`: Ionic Vue, Capacitor, SQLite local criptografado, biometria/PIN e uma camada de dados local. O Android não depende da API do desktop para consultas ou alterações; no navegador de desenvolvimento usa armazenamento local. A sincronização sob comando do usuário permanece para uma etapa futura.
+- As oito áreas navegáveis do Android — Visão geral, Transações, Orçamentos, Metas, Recebimentos, Agenda, Cartões e Assinaturas SaaS — estão adaptadas para celulares em retrato de 320 a 430 px, com campos em coluna única, controles de toque, respeito às áreas seguras, detalhes e modais em tela cheia e rolagem horizontal contida para tabelas. A barra inferior mantém as áreas secundárias acessíveis em `Mais`; ações de editar/excluir que antes dependiam de clique com o botão direito têm atalhos visíveis nas listas. Os detalhes de Metas e Recebimentos preservam histórico e formulários em fluxo próprio; Transações abre o formulário sob demanda para priorizar o histórico.
 - O guia de desenvolvimento e instalação no aparelho Android, incluindo live reload e o tratamento de mudanças nativas, está em `mobile/cypher-android/README.md`.
 - O comando `pnpm --dir mobile/cypher-android android:usb` conecta um aparelho Android por ADB, redireciona Vite/API pelas portas 5173/8000 e inicia o Capacitor em live reload sem depender de Wi-Fi; o backend deve estar em execução antes de usá-lo.
 - Edições modulares Android são definidas por JSON: `mobile/cypher-android/src/modules/catalog.json` cataloga rotas, telas, navegação e dependências; `mobile/cypher-android/editions/*.json` seleciona módulos de entrada. O Vite inclui no bundle somente as views da edição ativa.
@@ -198,10 +198,10 @@ Prioridades e escopo devem ser confirmados contra o documento de requisitos e `s
 | Simulações | Sem cálculos de juros, aposentadoria, metas ou Monte Carlo |
 | Cartão de crédito | Não há edição/exclusão de cartão, fatura automática por fechamento, limites disponíveis, parcelamento consolidado ou integração com outros bancos; a importação CSV Nubank está implementada |
 | Notificações | Sem scheduler, preferências ou notificações locais/web |
-| Sincronização mobile | O cache e a fila local existem, mas o protocolo de sincronização LAN com o FastAPI ainda não foi implementado |
+| Sincronização mobile | Não implementada por decisão de produto: o app é local-first e a futura sincronização será explicitamente acionada pelo usuário. |
 | Desktop distribuível | Sem diretório Electron, `electron-builder`, runtime Python empacotado ou instaladores |
 | Visualização | Chart.js e Plotly não são dependências instaladas; dashboard não traz gráficos dessas bibliotecas |
-| Responsividade e acessibilidade | A primeira camada visual das quatro telas Android principais foi adaptada a 393 px; ainda faltam as demais áreas Android, auditoria de acessibilidade e QA com dados da API no navegador interno. |
+| Responsividade e acessibilidade | As oito telas Android têm regras de layout para celulares em retrato de 320 a 430 px. Ainda falta uma auditoria formal de acessibilidade e QA visual em aparelho com dados representativos. |
 | Verificação visual | `design-qa.md` registra que a comparação com o protótipo foi bloqueada pela abertura local no navegador |
 
 ## Decisões e convenções registradas

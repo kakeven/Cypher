@@ -16,14 +16,12 @@ if ($connectedDevices.Count -eq 0) {
 $repositoryPath = Resolve-Path (Join-Path $PSScriptRoot '..\..\..')
 Push-Location $repositoryPath
 try {
-    & docker compose up -d backend cypher-android
+    & docker compose up -d cypher-android
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
     }
 
     & adb reverse tcp:5173 tcp:5174
-    & adb reverse tcp:8000 tcp:8000
-
     $viteReady = $false
     for ($attempt = 0; $attempt -lt 20; $attempt++) {
         if (Test-NetConnection -ComputerName '127.0.0.1' -Port 5174 -InformationLevel Quiet) {

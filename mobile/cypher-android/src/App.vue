@@ -70,15 +70,23 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .empty { color: var(--color-text-secondary); padding: 32px; text-align: center; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 @media (max-width: 1120px) { .app-content { padding: 24px 28px; } }
-.app-shell--mobile { display: block; height: 100dvh; min-height: 0; overflow-x: hidden; overflow-y: auto; padding-bottom: calc(70px + env(safe-area-inset-bottom)); background: var(--color-bg); touch-action: pan-y; -webkit-overflow-scrolling: touch; }
+.app-shell--mobile { display: block; width: 100%; height: 100dvh; min-height: 0; overflow-x: clip; overflow-y: auto; padding-bottom: calc(70px + env(safe-area-inset-bottom)); background: var(--color-bg); touch-action: pan-y; -webkit-overflow-scrolling: touch; }
 .app-shell--mobile .app-content { min-height: 100%; padding: max(18px, env(safe-area-inset-top)) 14px calc(98px + env(safe-area-inset-bottom)); }
+.app-shell--mobile .app-content > * { min-width: 0; }
 .app-shell--mobile .page-header { gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+.app-shell--mobile .page-header > div { min-width: 0; flex: 1 1 100%; }
 .app-shell--mobile .page-header h1 { font-family: var(--font-family); font-size: 21px; font-weight: 700; letter-spacing: -0.045em; }
 .app-shell--mobile .page-header p { margin-top: 3px; font-size: 12px; }
 .app-shell--mobile .form-grid { grid-template-columns: 1fr; }
+.app-shell--mobile .form-grid > *, .app-shell--mobile .form-grid label { min-width: 0; }
 .app-shell--mobile .card { padding: 14px; border-radius: 12px; box-shadow: 0 10px 24px rgba(0, 0, 0, .16); }
 .app-shell--mobile .button { min-height: 42px; border-radius: 10px; }
 .app-shell--mobile .input { min-height: 42px; border-radius: 10px; background: rgba(7, 15, 25, .52); }
+.app-shell--mobile .date-input { width: 100%; min-width: 0; }
+.app-shell--mobile .actions, .app-shell--mobile .modal-actions { flex-wrap: wrap; }
+.app-shell--mobile .actions > .button, .app-shell--mobile .modal-actions > .button { flex: 1 1 auto; }
+.app-shell--mobile .context-menu { max-width: calc(100vw - 24px); }
+.app-shell--mobile .context-menu button, .app-shell--mobile .close-modal { min-height: 44px; }
 .app-shell--mobile .dashboard-summary,
 .app-shell--mobile .dashboard-bottom,
 .app-shell--mobile .category-visualization,
@@ -99,5 +107,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .app-shell--mobile .file { min-width: 0; width: 100%; }
 .app-shell--mobile .table-card,
 .app-shell--mobile .invoice-detail { overflow-x: auto; }
-.app-shell--mobile .drawer { width: 100vw; max-width: 100vw; }
+.app-shell--mobile .drawer { position: fixed; z-index: 45; inset: 0; width: 100vw; max-width: 100vw; height: 100dvh; padding: max(18px, env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom)); overflow-y: auto; border: 0; border-radius: 0; }
+.app-shell--mobile .drawer header { position: sticky; top: calc(-1 * max(18px, env(safe-area-inset-top))); z-index: 1; align-items: center; margin: calc(-1 * max(18px, env(safe-area-inset-top))) -16px 16px; padding: max(18px, env(safe-area-inset-top)) 16px 12px; border-bottom: 1px solid var(--color-border); background: var(--color-surface-raised); }
+@media (max-width: 360px) {
+  .app-shell--mobile .app-content { padding-right: 12px; padding-left: 12px; }
+  .app-shell--mobile .quick-stats { gap: 8px; }
+  .app-shell--mobile .quick-stats > div { min-width: 0; padding: 10px; }
+  .app-shell--mobile .quick-stats b { font-size: 14px; overflow-wrap: anywhere; }
+}
 </style>
